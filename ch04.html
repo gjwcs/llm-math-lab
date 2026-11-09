@@ -5,62 +5,66 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>第 4 章 · 在线实验室</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="assets/lab.css">
+<link rel="stylesheet" href="assets/lab.css?v=20261110">
+<style>@media (max-width: 640px) { .card-title { flex-wrap: wrap; } .card-title .sub { margin-left: 32px; flex-basis: 100%; } .stats { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); } }</style>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-<script defer src="assets/lab.js"></script>
+<script defer src="assets/lab.js?v=20261110"></script>
 <script defer src="ch04.js"></script>
 </head>
 <body data-chapter="4">
 <main class="container">
 
   <!-- ========================= 实验 1 ========================= -->
-  <section class="experiment" id="kernel-trick" data-title="核技巧：把异或抬进三维">
+  <section class="experiment" id="lift" data-title="提起床单切异或">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">1</span>参数控制台</div>
-        <p class="small">用 $\boldsymbol\phi(x_1,x_2)=(x_1^2,\ \sqrt2x_1x_2,\ x_2^2)$ 把平面上的点抬到三维，再用一个平面切开。<b>左图可拖动点</b>，右图可拖动旋转。</p>
-        <div class="small muted">数据：</div>
-        <div id="k-data" style="margin:6px 0 4px"></div>
-        <div id="k-extra"></div>
-        <div id="k-noise"></div>
-        <div id="k-spin"></div>
-        <div class="btn-row">
-          <button class="btn ghost" id="k-reset">复原书中 4 个点</button>
-          <button class="btn ghost" id="k-reseed">重新撒点</button>
+        <div class="small muted">桌上的豆子：</div>
+        <div id="l-data" style="margin:6px 0 4px"></div>
+        <div class="small muted">怎么切：</div>
+        <div id="l-mode" style="margin:6px 0 4px"></div>
+        <div id="l-flat">
+          <p class="small">在桌面上直直切一刀：$f(x_1,x_2)=w_1x_1+w_2x_2+b$，$f&gt;0$ 判为红豆。</p>
+          <div id="l-w1"></div><div id="l-w2"></div><div id="l-b"></div>
+          <div class="btn-row"><button class="btn ghost" id="l-search">让电脑把所有直线都试一遍</button></div>
+        </div>
+        <div id="l-lift" style="display:none">
+          <p class="small" id="l-liftdesc"></p>
+          <div id="l-c"></div>
+          <div id="l-spin"></div>
         </div>
       </div>
       <div class="stack">
         <div class="row2">
           <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c1)">2D</span>原始平面 $(x_1,x_2)$</div>
-            <div class="viz h340" id="k-2d"></div>
-            <div class="caption">底色是特征空间分割平面投影回来的决策区域。红 = 正类 $+1$，蓝 = 负类 $-1$。</div>
+            <div class="card-title"><span class="dot" style="background:var(--c1)">2D</span>桌面 $(x_1,x_2)$</div>
+            <div class="viz h340" id="l-2d"></div>
+            <div class="caption" id="l-cap2"></div>
           </div>
           <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c5)">3D</span>特征空间 $\boldsymbol\phi(\mathbf x)$</div>
-            <div class="viz h340" id="k-3d"></div>
-            <div class="caption" id="k-plane"></div>
+            <div class="card-title"><span class="dot" style="background:var(--c5)">3D</span>提起床单后的空间<span class="sub">可拖动旋转</span></div>
+            <div class="viz h340" id="l-3d"></div>
+            <div class="caption" id="l-cap3"></div>
           </div>
         </div>
-        <div class="stats" id="k-stats"></div>
+        <div class="stats" id="l-stats"></div>
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c3)">K</span>4 个编号点的核矩阵：$(\mathbf x_i^\top\mathbf x_j)^2$ 与 $\langle\boldsymbol\phi(\mathbf x_i),\boldsymbol\phi(\mathbf x_j)\rangle$</div>
-          <div style="overflow-x:auto"><table class="data" id="k-table"></table></div>
-          <div class="caption">异或模式下这 4 个点就是书中 §4.4 手算的 $(\pm1,\pm1)$。两种算法逐项相等：左边只在二维里做一次内积再平方，右边先抬到三维再做内积。拖动带编号的点，表格实时更新。</div>
+          <div class="card-title"><span class="dot" style="background:var(--c3)">✍</span>每颗豆子的账本<span class="sub">随左侧参数实时重算</span></div>
+          <div style="overflow-x:auto"><table class="data" id="l-table"></table></div>
+          <div class="caption" id="l-tcap"></div>
         </div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-          <div class="formula">$$K(\mathbf{x}, \mathbf{z}) = (\mathbf{x}^\top \mathbf{z})^2 = x_1^2 z_1^2 + \sqrt{2} x_1 x_2 (\sqrt{2} z_1 z_2) + x_2^2 z_2^2 = \big\langle \boldsymbol{\phi}(\mathbf{x}), \boldsymbol{\phi}(\mathbf{z}) \big\rangle$$</div>
-          <div class="explain">在二维里，正类要求 $b&gt;0$、负类要求 $b&lt;0$，任何直线都切不开异或。抬到三维后只看第二个坐标 $\phi_2=\sqrt2x_1x_2$：正类是 $+\sqrt2$，负类是 $-\sqrt2$，一个水平面就切开了。核技巧的妙处在于，算内积时根本不必真的把点抬上去。</div>
+          <div class="formula">$$\mathbf{x}=(x_1,x_2)\;\xrightarrow{\text{把床单提起来}}\;\phi(\mathbf{x})=(x_1,\,x_2,\,x_1x_2),\qquad F(\mathbf x)=\mathbf{w}^\top\phi(\mathbf{x})+b$$</div>
+          <div class="explain">在桌面上，两颗红豆要求 $\pm w_1\pm w_2+b&gt;0$，相加得 $b&gt;0$；两颗蓝豆相加又得 $b&lt;0$，所以任何直线都至少分错一颗。多算一列 $x_3=x_1x_2$ 后，红豆都升到 $+1$，蓝豆都沉到 $-1$，平面 $x_3=0$ 一刀切开。投影回桌面，这一刀就是能拐弯的曲线 $x_1x_2=0$。圆环数据则用碗 $x_3=x_1^2+x_2^2$：内圈升到 $1$，外圈升到 $4$，平面 $x_3=2.5$ 切开，切口投影回桌面是半径 $\sqrt{2.5}\approx1.58$ 的圆。</div>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>在右图拖动旋转：从侧面看，红点全在上方、蓝点全在下方，中间那块平面就是 $\phi_2=0$，即 $x_1x_2=0$。</li>
-            <li>看核矩阵：同类点的核值都是 $4$，异类点都是 $0$。在特征空间里，异类点互相正交。</li>
-            <li>切到“同心圆”（草莓与蓝莓）：这回切开它们的平面是倾斜的 $x_1^2+x_2^2=r^2$，投影回平面恰好是一个圆。</li>
-            <li>把一个红点拖到蓝色区域深处：分割平面会怎样扭动来迁就它？</li>
+            <li>在“桌面上切一刀”模式里随便拖三个滑块，“分错的豆子”永远不会是 $0$。点“让电脑把所有直线都试一遍”，最好也只能分对 3 颗。</li>
+            <li>切到“提起床单”：红豆的高度都是 $+1$，蓝豆都是 $-1$；平面高度 $c$ 只要在 $-1$ 和 $+1$ 之间，就全部分对。</li>
+            <li>换成“圆环”（练习 4.1）：碗里内圈高 $1$、外圈高 $4$，把平面放在 $2.5$，左图里的切口正好是一个圆。</li>
           </ol>
         </div>
       </div>
@@ -68,53 +72,60 @@
   </section>
 
   <!-- ========================= 实验 2 ========================= -->
-  <section class="experiment" id="rff" data-title="核回归与随机傅里叶特征">
+  <section class="experiment" id="trick" data-title="先点积再平方">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">2</span>参数控制台</div>
-        <p class="small">RBF 核岭回归。<b>点空白处添加数据点，拖动可移动，拖出画布即删除。</b></p>
-        <div id="f-sigma"></div>
-        <div id="f-lambda"></div>
+        <p class="small">两个二维向量（书中是 $\mathbf x=(2,3)$、$\mathbf z=(4,1)$）：</p>
+        <div id="k-x1"></div><div id="k-x2"></div><div id="k-z1"></div><div id="k-z2"></div>
+        <div class="btn-row"><button class="btn ghost" id="k-reset">恢复书中的数字</button></div>
+        <div id="k-d"></div>
         <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
-        <div class="small muted">用 $D$ 个随机三角特征 $\mathbf z(\mathbf x)=\sqrt{2/D}\cos(\boldsymbol\Omega\mathbf x+\mathbf b)$ 近似同一个核：</div>
-        <div id="f-D"></div>
-        <div id="f-showrff"></div>
-        <div class="btn-row">
-          <button class="btn ghost" id="f-redraw">重新抽取 $\boldsymbol\omega,\mathbf b$</button>
-          <button class="btn ghost" id="f-data">随机数据</button>
-        </div>
+        <div class="small muted">第二部分：注意力里的指数核 $e^{u}$，$u=\mathbf q^\top\mathbf k$。</div>
+        <div id="e-u"></div>
+        <div id="e-n"></div>
       </div>
       <div class="stack">
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c1)">f</span>核岭回归 $f(x)=\mathbf k(x)^\top(\mathbf K+\lambda\mathbf I)^{-1}\mathbf y$</div>
-          <div class="viz h300" id="f-reg"></div>
-          <div class="legend"><span><i style="background:var(--c1)"></i>精确 RBF 核</span><span><i style="background:var(--c2)"></i>随机傅里叶特征（$D$ 维）</span><span><i style="background:#B8C1CC"></i>单个核函数 $\alpha_iK(x,x_i)$</span></div>
+          <div class="card-title"><span class="dot" style="background:var(--c2)">✍</span>笨办法 vs 聪明办法<span class="sub">随左侧参数实时重算</span></div>
+          <div class="row2">
+            <div>
+              <div class="small muted" style="margin-bottom:6px">笨办法：先升到三维，再逐项相乘相加</div>
+              <div style="overflow-x:auto"><table class="data" id="k-table"></table></div>
+            </div>
+            <div>
+              <div class="small muted" style="margin-bottom:6px">聪明办法：在二维里先点积、再平方</div>
+              <div class="formula" id="k-smart"></div>
+              <div class="formula" id="k-cost" style="border-left-color:var(--c2)"></div>
+            </div>
+          </div>
         </div>
-        <div class="stats" id="f-stats"></div>
+        <div class="stats" id="k-stats"></div>
         <div class="row2">
           <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c4)">K</span>核矩阵：精确 vs 随机特征</div>
-            <div class="viz h260" id="f-heat"></div>
-            <div class="caption">在 $[-3,3]$ 上取 24 个等距点。左：$\mathbf K_{ij}=e^{-(x_i-x_j)^2/2\sigma^2}$；右：$\mathbf z(x_i)^\top\mathbf z(x_j)$。</div>
+            <div class="card-title"><span class="dot" style="background:var(--c1)">Σ</span>$e^{u}$ 的泰勒展开：各阶的贡献</div>
+            <div class="viz h260" id="e-bars"></div>
+            <div class="caption">第 $n$ 根柱子是 $\dfrac{u^n}{n!}$，对应 $\mathbf q$ 与 $\mathbf k$ 的全部 $n$ 阶组合特征的内积（再除以 $n!$）。深色是已经保留的项。</div>
           </div>
           <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c2)">ε</span>近似误差随特征数 $D$ 下降</div>
-            <div class="viz h260" id="f-err"></div>
-            <div class="caption">相对误差 $\|\hat{\mathbf K}-\mathbf K\|_F/\|\mathbf K\|_F$（6 次抽样平均）。虚线是蒙特卡洛的 $1/\sqrt D$。</div>
+            <div class="card-title"><span class="dot" style="background:var(--c4)">≈</span>保留前 $n$ 阶的近似 vs 真实 $e^{u}$</div>
+            <div class="viz h260" id="e-curve"></div>
+            <div class="legend"><span><i style="background:#B8C1CC"></i>$e^{u}$</span><span><i style="background:var(--c4)"></i>$\sum_{k=0}^{n}u^k/k!$</span></div>
           </div>
         </div>
+        <div class="stats" id="e-stats"></div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-          <div class="formula">$$K(\mathbf{x} - \mathbf{x}') = \mathbb{E}_{\boldsymbol{\omega} \sim p(\boldsymbol{\omega})}\!\big[\cos(\boldsymbol{\omega}^\top(\mathbf{x} - \mathbf{x}'))\big] \approx \mathbf{z}(\mathbf{x})^\top \mathbf{z}(\mathbf{x}'), \quad \mathbf{z}(\mathbf{x}) = \sqrt{\frac{2}{D}}\cos(\boldsymbol{\Omega}\mathbf{x} + \mathbf{b})$$</div>
-          <div class="explain">Bochner 定理：平移不变的正定核是某个频率分布的傅里叶变换。高斯核对应 $p(\boldsymbol\omega)=\mathcal N(\mathbf 0,\sigma^{-2}\mathbf I)$。从中抽 $D$ 个频率，再配上均匀相位 $\mathbf b\sim\mathcal U[0,2\pi]^D$，内积就是核的无偏估计，误差按 $1/\sqrt D$ 缩小。Performer 线性注意力正是这个思路。</div>
+          <div class="formula">$$(\mathbf{x}^\top \mathbf{z})^2 = x_1^2 z_1^2 + 2 x_1 x_2 z_1 z_2 + x_2^2 z_2^2 = \big(x_1^2,\ \sqrt{2}x_1 x_2,\ x_2^2\big)\cdot\big(z_1^2,\ \sqrt{2}z_1 z_2,\ z_2^2\big) = \phi(\mathbf x)^\top\phi(\mathbf z)$$</div>
+          <div class="formula">$$e^{\mathbf{q}^\top \mathbf{k}} = 1 + \mathbf{q}^\top \mathbf{k} + \frac{(\mathbf{q}^\top \mathbf{k})^2}{2!} + \frac{(\mathbf{q}^\top \mathbf{k})^3}{3!} + \cdots$$</div>
+          <div class="explain">左边只做一次 $d$ 维点积和一次平方，右边要先算出所有二次乘积 $x_ix_j$。$d=1000$ 时笨办法要准备 $10^6$ 个乘积，聪明办法只做 1000 次乘法。指数核把所有阶的多项式核按 $1/n!$ 加在一起；只保留前三项 $1+u+u^2/2$，就是“泰勒展开线性注意力”的做法，$|u|$ 越小，近似越好。</div>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>把带宽 $\sigma$ 调到 $0.1$：曲线在每个点上冒尖、点间回落到 0（过拟合）；调到 $3$：几乎是一条直线（欠拟合）。</li>
-            <li>$\lambda$ 从 $10^{-4}$ 调到 $10$：曲线从穿过每个点变得越来越平，“有效自由度”随之减少。</li>
-            <li>$D=4$ 时随机特征的核矩阵满是斑点；拖到 $D=1024$，右边的热图与左边几乎一样，橙色回归线也贴住蓝色线。</li>
-            <li>多点几次“重新抽取”，看误差图上的红点在 $1/\sqrt D$ 虚线附近上下跳动。</li>
+            <li>保持书中的数字：笨办法是 $64+48+9=121$，聪明办法是 $11^2=121$，分毫不差。</li>
+            <li>把 $\mathbf z$ 拖到和 $\mathbf x$ 垂直（例如 $\mathbf z=(3,-2)$）：点积为 $0$，三维内积也是 $0$。</li>
+            <li>第二部分取 $u=1$、$n=2$：$1+1+0.5=2.5$，真实值 $e\approx2.718$；把 $u$ 拉到 $3$，只保留两阶就差得多了。</li>
           </ol>
         </div>
       </div>
@@ -122,63 +133,51 @@
   </section>
 
   <!-- ========================= 实验 3 ========================= -->
-  <section class="experiment" id="ntk" data-title="NTK 与频谱偏置">
+  <section class="experiment" id="ntk" data-title="两道题的 NTK 赛跑">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">3</span>参数控制台</div>
-        <p class="small">宽度为 $M$ 的两层 ReLU 网络 $f(x)=\frac{1}{\sqrt M}\sum_m a_m\operatorname{ReLU}(w_mx+b_m)$，在 40 个点上用梯度下降拟合 $y=A(\sin\pi x+\sin k\pi x)$。</p>
-        <div id="n-M"></div>
-        <div id="n-k"></div>
-        <div class="small muted">目标幅度（越小越“惰性”）：</div>
-        <div id="n-A" style="margin:6px 0 4px"></div>
-        <div class="btn-row">
-          <button class="btn teal" id="n-run">▶ 开始训练</button>
-          <button class="btn ghost" id="n-reset">重置</button>
-        </div>
-        <div class="caption" id="n-eta"></div>
+        <div class="small muted">神经正切核矩阵 $\mathbf K$（对称）：</div>
+        <div id="n-preset" style="margin:6px 0 4px"></div>
+        <div id="n-k11"></div><div id="n-k12"></div><div id="n-k22"></div>
+        <div id="n-eta"></div>
+        <div id="n-T"></div>
+        <p class="small muted">初始误差 $\mathbf e(0)=(10,\,10)$，每走一步 $\mathbf e_{t+1}=(\mathbf I-\eta\mathbf K)\,\mathbf e_t$。</p>
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <div class="small muted">第二部分：4.4 节的 2 参数微型模型 $f=\theta_1^2x_1+\theta_2^2x_2$，从 $\boldsymbol\theta_0=(1,1)$ 走 1 步：</div>
+        <div id="w-eta"></div>
       </div>
       <div class="stack">
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c1)">f</span>拟合过程<span class="sub" id="n-step"></span></div>
-          <div class="viz h300" id="n-fit"></div>
-          <div class="legend"><span><i style="background:#B8C1CC"></i>目标 $y$</span><span><i style="background:var(--c1)"></i>真实网络 $f(x;\boldsymbol\theta_t)$</span><span><i style="background:var(--c2)"></i>NTK 线性化预测</span></div>
+          <div class="card-title"><span class="dot" style="background:var(--c1)">e</span>两道题的误差怎么归零<span class="sub" id="n-sub"></span></div>
+          <div class="viz h340" id="n-main"></div>
+          <div class="legend"><span><i style="background:var(--c1)"></i>第 1 题 $e_1$</span><span><i style="background:var(--c2)"></i>第 2 题 $e_2$</span><span>圆点 = 离散梯度下降 $(\mathbf I-\eta\mathbf K)^t\mathbf e(0)$</span><span>细线 = 连续解 $e^{-\mathbf K\tau}\mathbf e(0)$，$\tau=\eta t$</span></div>
         </div>
         <div class="stats" id="n-stats"></div>
-        <div class="row2">
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c4)">r</span>残差的低频 / 高频分量</div>
-            <div class="viz h260" id="n-res"></div>
-            <div class="legend"><span><i style="background:var(--c3)"></i>低频 $\sin\pi x$</span><span><i style="background:var(--c4)"></i>高频 $\sin k\pi x$</span><span>实线 = 网络，虚线 = $e^{-\eta\boldsymbol\Theta_0t}$ 理论</span></div>
-          </div>
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c5)">Θ</span>核漂移 $\|\boldsymbol\Theta_t-\boldsymbol\Theta_0\|_F/\|\boldsymbol\Theta_0\|_F$</div>
-            <div class="viz h260" id="n-drift"></div>
-            <div class="caption">每次训练完成后留下一条曲线（虚线为 $A=1$）。宽度越大、幅度越小，核越接近“冻结”。</div>
-          </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c3)">✍</span>前几步手算账本</div>
+          <div style="overflow-x:auto"><table class="data" id="n-table"></table></div>
+          <div class="caption">书中 $\mathbf K=\operatorname{diag}(4,1)$、$\eta=0.1$：第 1 题每步乘 $0.6$，$10\to6\to3.6\to2.16$；第 2 题每步乘 $0.9$，$10\to9\to8.1\to7.29$。</div>
         </div>
-        <div class="row2">
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c6)">λ</span>初始 NTK 的特征值谱</div>
-            <div class="viz h260" id="n-spec"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--coral)">θ</span>4.4 节算例：NTK 预测 vs 真实走一步<span class="sub" id="w-sub"></span></div>
+          <div class="row2">
+            <div style="overflow-x:auto"><table class="data" id="w-table"></table></div>
+            <div class="viz h260" id="w-gap"></div>
           </div>
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c6)">u</span>前 4 个特征向量</div>
-            <div class="viz h260" id="n-vec"></div>
-            <div class="caption">特征值越大，特征向量越平滑：梯度下降先沿这些方向收敛。</div>
-          </div>
+          <div class="caption">右图横轴是学习率 $\eta$（对数坐标），纵轴是真实误差与 NTK 预测之差。两者之差正是步长平方项 $\Delta\theta_1^2x_1+\Delta\theta_2^2x_2$，随 $\eta^2$ 缩小：$\eta$ 缩小 10 倍，差距缩小 100 倍。</div>
         </div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-          <div class="formula">$$\Theta_{\boldsymbol{\theta}}(\mathbf{x}, \mathbf{x}') = \big\langle \nabla_{\boldsymbol{\theta}} f(\mathbf{x}; \boldsymbol{\theta}), \, \nabla_{\boldsymbol{\theta}} f(\mathbf{x}'; \boldsymbol{\theta}) \big\rangle,\qquad \frac{d\mathbf{f}(t)}{dt} = -\boldsymbol{\Theta}(t)\big(\mathbf{f}(t) - \mathbf{y}\big) \xrightarrow{M \to \infty} \mathbf{f}(t) - \mathbf{y} = e^{-\boldsymbol{\Theta}_0 t}\big(\mathbf{f}(0) - \mathbf{y}\big)$$</div>
-          <div class="explain">把 $\boldsymbol\Theta_0=\sum_k\lambda_k\mathbf u_k\mathbf u_k^\top$ 做特征分解，残差在第 $k$ 个方向上按 $e^{-\lambda_kt}$ 衰减（离散步长下是 $(1-\eta\lambda_k)^t$）。大特征值对应平滑的低频方向，于是网络<b>先学轮廓、后学细节</b>，这就是频谱偏置。这里用了成对初始化（$a_{m+M/2}=-a_m$），使 $f(x;\boldsymbol\theta_0)\equiv0$，学习率取 $\eta=0.9/\lambda_{\max}$。</div>
+          <div class="formula">$$K_{ij}=\big\langle \nabla_{\boldsymbol\theta} f(x^{(i)}),\,\nabla_{\boldsymbol\theta} f(x^{(j)})\big\rangle,\qquad \frac{\mathrm d\mathbf e}{\mathrm d\tau}=-\mathbf K\mathbf e\ \Longrightarrow\ \mathbf e(\tau)=\sum_i(\mathbf u_i^\top\mathbf e(0))\,e^{-\lambda_i\tau}\,\mathbf u_i$$</div>
+          <div class="explain">沿 $\mathbf K$ 的每个特征方向，误差按 $e^{-\lambda_i\tau}$ 衰减：特征值越大，归零越快。离散地走，每步在该方向上乘以公比 $1-\eta\lambda_i$，要不发散就得 $|1-\eta\lambda_i|&lt;1$，即 $\eta&lt;2/\lambda_{\max}$。练习 4.3 与 4.4 的 $\mathbf K=\begin{bmatrix}5&amp;4\\4&amp;5\end{bmatrix}$ 有 $\lambda=9,1$，所以 $\eta&lt;2/9\approx0.222$；$\eta=0.3$ 时公比是 $-1.7$，误差正负交替地放大。</div>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>按“开始训练”：绿色的低频残差几百步就掉下去，红色的高频残差要多等一个数量级，蓝线先画出 $\sin\pi x$ 的大轮廓。</li>
-            <li>宽度 $M=16$ 训练一次，再 $M=4096$ 训练一次：宽网络的实线贴着虚线走得更久，核漂移也小一个数量级。</li>
-            <li>把幅度换成 $A=1$：为了拟合更大的目标，权重必须走得更远，核明显变形，网络脱离 NTK 预测，进入特征学习区（§4.7 的 $\mu$P 正是要留在这里）。</li>
-            <li>看右下图：特征值越往后，特征向量振荡越快。把 $k$ 从 2 调到 6，高频成分落在更小的特征值上，学得更慢。</li>
+            <li>默认 $\mathbf K=\operatorname{diag}(4,1)$：蓝点像坐火箭一样归零，橙点慢吞吞。对照账本里的 $6,\,3.6,\,2.16$ 与 $9,\,8.1,\,7.29$。</li>
+            <li>选“练习 4.3/4.4”，把 $\eta$ 拉到 $0.22$ 再拉到 $0.30$：越过 $2/9$ 之后，大特征值方向的误差开始来回放大。</li>
+            <li>第二部分默认 $\eta=0.05$：NTK 预测 $(-0.80,-2.00)$，真实 $(-0.44,-1.48)$，差 $(0.36,0.52)$。把 $\eta$ 调到 $0.005$，差距缩小到原来的约 $1\%$。</li>
           </ol>
         </div>
       </div>

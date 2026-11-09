@@ -1,7 +1,7 @@
 /* 第 10 章：泛化理论与 Scaling Laws：交互实验 */
 (function () {
   const { COLORS: C, M } = LAB;
-  LAB.page({ bookRef: '对应书中 §10.2 Chinchilla 幂律与拉格朗日推导 · §10.3 涌现能力 · §10.5 手算算例 · 开篇故事中的双下降' });
+  LAB.page({ bookRef: '对应书中 §10.1 三位考生与最小平方和 · §10.2 Chinchilla 求导 · §10.3 给 6×10²¹ FLOPs 算模型大小' });
 
   const $ = (s) => document.querySelector(s);
   const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
@@ -32,7 +32,7 @@
   /* ================= 实验 1：Chinchilla 计算器 ================= */
   const PRE = [
     { name: 'Chinchilla 拟合', E: 1.69, A: 406.4, B: 410.7, a: 0.34, b: 0.28 },
-    { name: '书中手算常数', E: 1.69, A: 400, B: 400, a: 0.3, b: 0.3 },
+    { name: 'Epoch AI 重新拟合', E: 1.82, A: 482.01, B: 2085.43, a: 0.3478, b: 0.3658 },
   ];
   const S = { pre: 0, C: 6e21, E: 1.69, A: 406.4, B: 410.7, a: 0.34, b: 0.28, selN: null };
   const NR = [1e7, 1e13], DR = [1e8, 1e14];
@@ -116,72 +116,56 @@
   }
   upd1();
 
-  /* ================= 实验 2：涌现 ================= */
-  const EM = { K: 20, eps: 0.005, a: 0.34, A: 406.4, ntest: 500, log: false, seed: 1, selN: null };
-  const ell = (N) => EM.eps + EM.A * Math.pow(N, -EM.a);
-  const pTok = (N) => Math.exp(-ell(N));
-  const acc = (N, K) => Math.exp(-K * ell(N));
-  const Ncrit = () => (1 / EM.K > EM.eps ? Math.pow(EM.A / (1 / EM.K - EM.eps), 1 / EM.a) : Infinity);
-  const NX = [1e7, 1e15];
-  LAB.slider('#e-K', { label: '串行关键步数 $K$', min: 1, max: 100, step: 1, value: EM.K, onInput: (v) => { EM.K = v; EM.selN = null; sample(); upd2(); } });
-  LAB.slider('#e-eps', { label: '任务不可约误差 $\\varepsilon$', min: 0, max: 0.03, step: 0.001, value: EM.eps, fmt: (v) => v.toFixed(3), onInput: (v) => { EM.eps = v; EM.selN = null; sample(); upd2(); } });
-  LAB.slider('#e-alpha', { label: '幂指数 $\\alpha$', min: 0.2, max: 0.5, step: 0.01, value: EM.a, fmt: (v) => v.toFixed(2), onInput: (v) => { EM.a = v; EM.selN = null; sample(); upd2(); } });
-  const NT = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000];
-  LAB.slider('#e-ntest', { label: '测试集题目数', min: 0, max: NT.length - 1, step: 1, value: NT.indexOf(EM.ntest), fmt: (v) => NT[v].toLocaleString(), onInput: (v) => { EM.ntest = NT[v]; sample(); upd2(); } });
-  LAB.checkbox('#e-log', '准确率纵轴取对数', false, (v) => { EM.log = v; accCv.redraw(); });
-  $('#e-resample').onclick = () => { EM.seed++; sample(); upd2(); };
-  let meas = [];
-  function sample() {
-    const R = LAB.rng(300 + EM.seed);
-    meas = M.range(17).map((k) => { const N = Math.pow(10, 7 + k / 2), pr = acc(N, EM.K); let c = 0; for (let i = 0; i < EM.ntest; i++) if (R() < pr) c++; return [N, c / EM.ntest]; });
-  }
-  const lossCv = LAB.canvas('#e-loss', (ctx, w, h) => {
-    const P = new LAB.Plot(ctx, w, h, { xmin: NX[0], xmax: NX[1], ymin: 1e-3, ymax: 10, logx: true, logy: true, xtickValues: decades(7, 15), xfmt: powFmt, ytickValues: [1e-3, 1e-2, 0.1, 1, 10], xlabel: '模型参数量 N', ylabel: '单步损失 ℓ', pad: { l: 50, r: 40, t: 12, b: 36 } }).axes();
-    P.clip(); P.fn(ell, C.c1, 2.6); P.unclip();
-    // 右轴：p
-    const py = (p) => P.y0 - p * (P.y0 - P.y1);
-    ctx.save(); ctx.strokeStyle = C.c3; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.beginPath();
-    for (let i = 0; i <= 300; i++) { const N = NX[0] * Math.pow(NX[1] / NX[0], i / 300), X = P.tx(N), Y = py(pTok(N)); if (i) ctx.lineTo(X, Y); else ctx.moveTo(X, Y); }
-    ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = C.c3; ctx.font = '11px Avenir Next, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    [0, 0.5, 1].forEach((p) => ctx.fillText(p === 0 ? '0' : String(p), P.x1 + 6, py(p)));
-    ctx.save(); ctx.translate(w - 8, (P.y0 + P.y1) / 2); ctx.rotate(Math.PI / 2); ctx.textAlign = 'center'; ctx.fillText('p', 0, 0); ctx.restore();
-    ctx.restore();
-    const Nc = Ncrit(); if (isFinite(Nc) && Nc < NX[1]) P.vline(Nc, C.c4, [3, 3]);
+  /* ================= 实验 2：旋钮平分与临界爆炸 ================= */
+  const SH = { N: 2, y: 2, eps: 0.001, del: 0.099 };
+  const EPSS = [1e-4, 2e-4, 5e-4, 1e-3, 2e-3, 5e-3, 1e-2, 2e-2, 5e-2, 0.1];
+  const sN = LAB.slider('#s-N', { label: '旋钮个数 $N$', min: 0, max: 3, step: 0.01, value: Math.log10(SH.N), fmt: () => String(SH.N), onInput: (v) => { SH.N = Math.max(1, Math.round(Math.pow(10, v))); upd2(); } });
+  const sY = LAB.slider('#s-y', { label: '标准答案 $y$', min: 0.5, max: 5, step: 0.1, value: SH.y, fmt: (v) => v.toFixed(1), onInput: (v) => { SH.y = v; upd2(); } });
+  const sEps = LAB.slider('#s-eps', { label: '两道题的差别 $\\varepsilon$', min: 0, max: EPSS.length - 1, step: 1, value: EPSS.indexOf(SH.eps), fmt: (v) => fe(EPSS[v]), hint: '第 2 题的输入是 $(1,\\,1+\\varepsilon)$', onInput: (v) => { SH.eps = EPSS[v]; upd2(); } });
+  const sDel = LAB.slider('#s-b2', { label: '第 2 题印错了多少 $\\delta$', min: 0, max: 0.2, step: 0.001, value: SH.del, fmt: (v) => `${v.toFixed(3)}（印成 ${(2 + SH.eps + v).toFixed(4).replace(/0+$/, '').replace(/\.$/, '')}）`, onInput: (v) => { SH.del = v; upd2(); } });
+  $('#s-book').onclick = () => { Object.assign(SH, { N: 2, y: 2, eps: 0.001, del: 0.099 }); sN.set(Math.log10(2)); sY.set(2); sEps.set(EPSS.indexOf(0.001)); sDel.set(0.099); upd2(); };
+  const shareCv = LAB.canvas('#s-curve', (ctx, w, h) => {
+    const yy = SH.y * SH.y;
+    const P = new LAB.Plot(ctx, w, h, { xmin: 1, xmax: 1000, ymin: 1e-3, ymax: 100, logx: true, logy: true, xtickValues: [1, 2, 10, 100, 1000], xfmt: (v) => String(v), ytickValues: [1e-3, 1e-2, 0.1, 1, 10, 100], xlabel: '旋钮个数 N', ylabel: '最小平方和', pad: { l: 50, r: 14, t: 12, b: 36 } }).axes();
+    P.clip(); P.fn((N) => yy / N, C.c1, 2.6); P.unclip();
+    if (Math.abs(SH.y - 2) < 1e-9) { P.points([1, 2, 100], [4, 2, 0.04], C.amber, 5, '#fff'); P.text(1.1, 4, ' 4', C.amber, 'left', 'bottom'); P.text(2.1, 2, ' 2', C.amber, 'left', 'bottom'); P.text(105, 0.04, ' 0.04', C.amber, 'left', 'bottom'); }
+    P.vline(SH.N, C.ink, [2, 3], 1);
+    P.points([SH.N], [yy / SH.N], C.coral, 6, '#fff');
   });
-  const accCv = LAB.canvas('#e-acc', (ctx, w, h) => {
-    const lg = EM.log, ymin = lg ? 1e-6 : 0;
-    const P = new LAB.Plot(ctx, w, h, { xmin: NX[0], xmax: NX[1], ymin, ymax: 1, logx: true, logy: lg, xtickValues: decades(7, 15), xfmt: powFmt, ytickValues: lg ? [1e-6, 1e-4, 1e-2, 1] : [0, 0.25, 0.5, 0.75, 1], yfmt: lg ? null : (v) => v * 100 + '%', xlabel: '模型参数量 N', ylabel: '任务准确率', pad: { l: 50, r: 14, t: 12, b: 36 } }).axes();
-    accCv._P = P;
+  const linesCv = LAB.canvas('#s-lines', (ctx, w, h) => {
+    const w2 = 1 + SH.del / SH.eps, w1 = 1 - SH.del / SH.eps;
+    const span = Math.max(4, 1.25 * Math.max(Math.abs(w1 - 1), Math.abs(w2 - 1)) + 2);
+    const cx = (w1 + 1) / 2, cy = (w2 + 1) / 2;
+    const ar = (w - 64) / (h - 48);
+    const P = new LAB.Plot(ctx, w, h, { xmin: cx - span * ar / 2, xmax: cx + span * ar / 2, ymin: cy - span / 2, ymax: cy + span / 2, xlabel: 'w₁', ylabel: 'w₂', pad: { l: 50, r: 14, t: 12, b: 36 } }).axes();
     P.clip();
-    const fl = (v) => (lg ? Math.max(v, 1e-7) : v);
-    [1, 5, 10, 20, 50, 100].forEach((K) => { if (K !== EM.K) P.fn((N) => fl(acc(N, K)), '#cfd6de', 1.2); });
-    P.fn((N) => fl(pTok(N)), C.c3, 2, [6, 4]);
-    P.fn((N) => fl(acc(N, EM.K)), C.c4, 3);
+    P.fn((x) => 2 - x, C.c4, 2.6);
+    P.fn((x) => (2 + SH.eps + SH.del - x) / (1 + SH.eps), C.c1, 1.8, [7, 5]);
     P.unclip();
-    const Nc = Ncrit();
-    if (isFinite(Nc) && Nc < NX[1]) { P.vline(Nc, C.c4, [3, 3]); P.text(Nc, lg ? 0.5 : 0.96, ' N_crit', C.c4, 'left', 'top', '11px Avenir Next, sans-serif'); }
-    meas.forEach(([N, a]) => { if (a > 0 || !lg) P.points([N], [Math.max(a, ymin)], C.navy, 4.5, '#fff'); else { ctx.save(); ctx.strokeStyle = C.navy; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(P.tx(N), P.y0 - 5, 4, 0, 7); ctx.stroke(); ctx.restore(); } });
-    const Ns = EM.selN || (isFinite(Nc) ? Nc : 1e12);
-    P.vline(Ns, C.ink, [2, 3], 1);
+    P.points([1], [1], C.leaf, 6, '#fff');
+    P.points([w1], [w2], C.navy, 6.5, '#fff');
+    P.text(w1, w2, `  (${fe(w1)}, ${fe(w2)})`, C.navy, 'left', 'bottom');
   });
-  pointer('#e-acc', { down: (x) => { const P = accCv._P; if (!P) return; EM.selN = M.clamp(P.ix(x), NX[0], NX[1]); upd2(); }, move: (x) => { const P = accCv._P; if (!P) return; EM.selN = M.clamp(P.ix(x), NX[0], NX[1]); upd2(); } });
-  const e1 = LAB.stat('#e-stats', '临界规模 $N_{\\text{crit}}$', 'coral');
-  const e2 = LAB.stat('#e-stats', '所选 $N$', 'plum');
-  const e3 = LAB.stat('#e-stats', '单步正确率 $p$', 'leaf');
-  const e4 = LAB.stat('#e-stats', '任务准确率 $p^K$', 'coral');
+  const s1 = LAB.stat('#s-stats', '每个旋钮 $w_i=y/N$');
+  const s2 = LAB.stat('#s-stats', '平方和 $y^2/N$', 'teal');
+  const s3 = LAB.stat('#s-stats', '只开 1 个旋钮的平方和', 'coral');
+  const t1 = LAB.stat('#s-stats2', '硬解出的 $(w_1,w_2)$', 'plum');
+  const t2 = LAB.stat('#s-stats2', '平方和 $w_1^2+w_2^2$', 'coral');
+  const t3 = LAB.stat('#s-stats2', '最小奇异值 $\\sigma_{\\min}$');
+  const t4 = LAB.stat('#s-stats2', '放大倍数 $\\|\\Delta\\mathbf w\\|/\\delta$', 'amber');
   function upd2() {
-    const Nc = Ncrit(), Ns = EM.selN || (isFinite(Nc) ? Nc : 1e12);
-    e1.set(isFinite(Nc) ? big(Nc) : '∞'); e2.set(big(Ns)); e3.set(pTok(Ns).toFixed(4)); e4.set((acc(Ns, EM.K) * 100).toPrecision(3) + '<small>%</small>');
-    let html = `<tr><th>单步正确率 $p$</th><th>$p^{${EM.K}}$</th><th>书中 $K=50$</th></tr>`;
-    [0.85, 0.9, 0.98, 0.99].forEach((p) => { html += `<tr><td>${p.toFixed(2)}</td><td>${fe(Math.pow(p, EM.K) * 100)}%</td><td>${fe(Math.pow(p, 50) * 100)}%</td></tr>`; });
-    $('#e-table').innerHTML = html; LAB.renderMath($('#e-table'));
-    lossCv.redraw(); accCv.redraw();
+    const yy = SH.y * SH.y;
+    s1.set(fe(SH.y / SH.N)); s2.set(fe(yy / SH.N)); s3.set(fe(yy));
+    const r = SH.del / SH.eps, w1 = 1 - r, w2 = 1 + r, e = SH.eps;
+    const smin = ((2 + e) - Math.sqrt((2 + e) * (2 + e) - 4 * e)) / 2;
+    t1.set(`(${fe(w1)}, ${fe(w2)})`); const ss = w1 * w1 + w2 * w2; t2.set(ss >= 1000 && ss < 1e8 ? Math.round(ss).toLocaleString() : fe(ss)); t3.set(fe(smin)); t4.set(SH.del > 0 ? fe(Math.SQRT2 * r / SH.del) : '–');
+    sDel.set(SH.del);
+    shareCv.redraw(); linesCv.redraw();
   }
-  sample(); upd2();
+  upd2();
 
   /* ================= 实验 3：双下降 ================= */
-  const DD = { n: 40, sigma: 0.3, lam: 1e-9, p: 320, seed: 7 };
+  const DD = { n: 10, sigma: 0.3, lam: 1e-9, p: 80, seed: 7 };
   const XF = M.range(801).map((i) => -1 + i / 400), FF = XF.map((x) => Math.sin(2.5 * x) + 0.5 * Math.cos(5 * x));
   const NF = 5, MT = 200, Q = 0.2, BWS = 4, BWP = 150, RHO = 0.1;
   const ftrue = (x) => Math.sin(2.5 * x) + 0.5 * Math.cos(5 * x);
@@ -226,7 +210,7 @@
   const sP = LAB.slider('#dd-p', { label: '特征数 $p$', min: 1, max: 8 * DD.n, step: 1, value: DD.p, fmt: (v) => `${v}（${(v / DD.n).toFixed(2)}n）`, onInput: (v) => { DD.p = v; draw3(); } });
   const LAMS = [1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1];
   LAB.slider('#dd-lam', { label: '岭系数 $\\lambda$', min: 0, max: LAMS.length - 1, step: 1, value: 0, fmt: (v) => fe(LAMS[v]), hint: '$10^{-9}$ 近似最小范数插值', onInput: (v) => { DD.lam = LAMS[v]; recompute(); } });
-  LAB.slider('#dd-n', { label: '训练样本数 $n$', min: 20, max: 50, step: 2, value: DD.n, onInput: (v) => { DD.p = Math.round((DD.p / DD.n) * v); DD.n = v; sP.setRange(1, 8 * v); sP.set(DD.p); recompute(); } });
+  LAB.slider('#dd-n', { label: '训练样本数（练习题数）$n$', min: 10, max: 50, step: 2, value: DD.n, onInput: (v) => { DD.p = Math.round((DD.p / DD.n) * v); DD.n = v; sP.setRange(1, 8 * v); sP.set(DD.p); recompute(); } });
   LAB.slider('#dd-sigma', { label: '标签噪声 $\\sigma$', min: 0, max: 0.6, step: 0.02, value: DD.sigma, fmt: (v) => v.toFixed(2), onInput: (v) => { DD.sigma = v; recompute(); } });
   $('#dd-resample').onclick = () => { DD.seed++; recompute(); };
   let pend3 = false;

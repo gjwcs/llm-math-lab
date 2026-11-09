@@ -5,17 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>第 7 章 · 在线实验室</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="assets/lab.css">
+<link rel="stylesheet" href="assets/lab.css?v=20261110">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-<script defer src="assets/lab.js"></script>
+<script defer src="assets/lab.js?v=20261110"></script>
 <script defer src="ch07.js"></script>
 </head>
 <body data-chapter="7">
 <main class="container">
 
   <!-- ========================= 实验 1 ========================= -->
-  <section class="experiment" id="depth" data-title="百层信号传播">
+  <section class="experiment" id="depth" data-title="百层连乘与 +1 直通车">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">1</span>搭一个百层网络</div>
@@ -33,6 +33,20 @@
         <div class="caption">损失取 $\mathcal L=\langle\mathbf u,\mathbf x_L\rangle$（$\mathbf u$ 为随机单位向量），于是顶层梯度范数恰为 1。</div>
       </div>
       <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c4)">×</span>先算一道连乘题（书中 7.1 节）<span class="sub">每层导数都是 $a$，连乘 $L$ 层</span></div>
+          <div class="row2">
+            <div>
+              <div id="m-a"></div>
+              <div id="m-L"></div>
+              <div class="formula" id="m-formula"></div>
+            </div>
+            <div class="viz h260" id="m-plot"></div>
+          </div>
+          <div class="legend"><span><i style="background:var(--c4)"></i>无残差：$a^l$</span><span><i style="background:var(--c3)"></i>残差直通车保底项：$1$</span></div>
+          <div class="stats" id="m-stats"></div>
+          <p class="small muted" style="margin:0">书中算例：$a=0.8$ 时 $0.8^{100}\approx2.04\times10^{-10}$，$a=1.2$ 时 $1.2^{100}\approx8.28\times10^{7}$；残差连接 $x_{l+1}=x_l+F_l(x_l)$ 让 $\partial x_{100}/\partial x_0=1+\cdots$，哪怕所有 $F_l'=0$，保底的 $1$ 也一分不少。下方方差账本对应书中练习 7.3：$2L$ 条方差为 1 的独立支线让主干道方差涨到 $1+2L$，每条支线乘 $1/\sqrt{2L}$ 后只涨到 $2$。</p>
+        </div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--c1)">→</span>前向：每层激活的均方根 $\operatorname{RMS}(\mathbf x_l)$<span class="sub">对数纵轴</span></div>
           <div class="viz h260" id="d-fwd"></div>
@@ -54,6 +68,7 @@
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
+            <li>在最上面的连乘题里，把 $a$ 设为 0.8、$L$ 设为 100：$a^L\approx2.04\times10^{-10}$，正是书中“百亿分之二”；拖到 1.2 变成约 $8.28\times10^{7}$。</li>
             <li>把增益 $g$ 从 0.9 拖到 1.1：无残差网络的首层梯度从 $10^{-10}$ 量级翻到 $10^{7}$ 量级，只有 $g=1$（Kaiming 临界初始化）附近能勉强维持。蓝色的 Pre-LN 几乎纹丝不动。</li>
             <li>看琥珀色曲线：Post-LN 顶层梯度是 1，传到底层只剩百分之一左右，正是书中说的“顶层梯度远大于底层”。虚线是只走恒等直通路的那部分，每个子层被除以约 $\sqrt{1+g^2}$，百层后小到 $10^{-27}$ 以下；Pre-LN 的这一项恒等于 1。</li>
             <li>勾选“支路输出 $\times 1/\sqrt{2L}$”：Pre-LN 末层 RMS 从约 $\sqrt{1+2Lg^2}$ 降到约 $\sqrt{1+g^2}$，Post-LN 的直通分量也被保住了。</li>
@@ -65,7 +80,7 @@
   </section>
 
   <!-- ========================= 实验 2 ========================= -->
-  <section class="experiment" id="rmsnorm" data-title="RMSNorm 超球面">
+  <section class="experiment" id="rmsnorm" data-title="(1,2,3,4) 的两种归一化">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">2</span>把向量拉回球面</div>
@@ -81,6 +96,18 @@
         <div class="caption">3D 视图可以拖动旋转。$\varepsilon=10^{-5}$ 放在根号里。</div>
       </div>
       <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c4)">✎</span>手算对比：LayerNorm 四步走 vs RMSNorm 两步走<span class="sub">默认是书中的 $\mathbf x=(1,2,3,4)$</span></div>
+          <div class="row2">
+            <div>
+              <div id="h-x1"></div><div id="h-x2"></div><div id="h-x3"></div><div id="h-x4"></div>
+              <div class="btn-row"><button class="btn ghost" id="h-reset">恢复 $(1,2,3,4)$</button><button class="btn ghost" id="h-x10">整体放大 10 倍</button></div>
+            </div>
+            <div class="viz h260" id="h-bars"></div>
+          </div>
+          <div style="overflow-x:auto"><table class="data" id="h-table"></table></div>
+          <p class="small muted" style="margin:0">书中算例：$\mu=2.5$、$\sigma^2=1.25$、$\sigma\approx1.118$，LayerNorm 输出 $(-1.34,-0.45,0.45,1.34)$；$\operatorname{RMS}=\sqrt{7.5}\approx2.7386$，RMSNorm 输出 $(0.365,0.730,1.095,1.461)$，平方和恰为 $4=d$。点“整体放大 10 倍”可以验证缩放不变性。</p>
+        </div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--c6)">◯</span>点云与它们的归一化像<span class="sub" id="n-sub"></span></div>
           <div class="viz sq" id="n-view" style="max-height:460px; touch-action:none; cursor:grab"></div>
@@ -107,6 +134,7 @@
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
+            <li>在手算卡片里把 $x_1$ 到 $x_4$ 全设成 100：RMSNorm 输出 $(1,1,1,1)$，LayerNorm 的方差为 0，只能靠 $\varepsilon$ 兜底，输出全是 0（书中问 7.2）。</li>
             <li>拖动“整体缩放 $\alpha$”：输入点云忽大忽小，输出纹丝不动，这就是尺度不变性 $\operatorname{RMSNorm}(\alpha\mathbf x)=\operatorname{RMSNorm}(\mathbf x)$。把 $\alpha$ 降到 $10^{-3}$ 时，$\varepsilon$ 开始起作用，输出被拉向球心。</li>
             <li>切到 LayerNorm 并调大偏移 $\mu$：沿 $\mathbf 1$ 方向的平移被整个减掉，三维点全部落在一个大圆上（只剩 $d-1$ 个自由度）。</li>
             <li>在 $d=2$ 下用 LayerNorm：所有点只剩两个去处 $\pm(1,-1)$。这就是为什么低维里“减均值”代价很大，高维里却几乎无感。</li>
@@ -118,7 +146,7 @@
   </section>
 
   <!-- ========================= 实验 3 ========================= -->
-  <section class="experiment" id="gating" data-title="门控激活与秩坍缩">
+  <section class="experiment" id="gating" data-title="SwiGLU 水龙头车间">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">3</span>激活函数与门控</div>
@@ -126,10 +154,11 @@
         <div id="g-deriv"></div>
         <div class="control"><div class="control-head"><span>门控曲面使用的激活</span></div><div id="g-kind"></div></div>
         <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
-        <div class="card-title" style="margin-bottom:4px"><span class="dot" style="background:var(--coral)">1</span>秩坍缩：$T=8$ 个词，$d=16$</div>
-        <div id="r-layer"></div>
-        <div id="r-tau"></div>
-        <div class="btn-row"><button class="btn ghost" id="r-resample">重新采样</button></div>
+        <div class="card-title" style="margin-bottom:4px"><span class="dot" style="background:var(--c3)">⊕</span>手算一层：$\mathbf x=(x_1,x_2)$</div>
+        <div id="t-x1"></div>
+        <div id="t-x2"></div>
+        <div class="btn-row"><button class="btn ghost" id="t-reset">恢复书中的 $(3,4)$</button></div>
+        <div class="caption">$\mathbf W_{\text{gate}}=\left[\begin{smallmatrix}1.1785&amp;0\\0&amp;0\end{smallmatrix}\right]$，$\mathbf W_{\text{up}}=\left[\begin{smallmatrix}2.357&amp;0\\0&amp;0.8839\end{smallmatrix}\right]$，$\mathbf W_{\text{down}}=\mathbf I$，$\boldsymbol\gamma=\mathbf 1$，$\epsilon=0$（书中 7.4 节）。</div>
       </div>
       <div class="stack">
         <div class="card">
@@ -151,22 +180,19 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--coral)">1</span>秩坍缩：纯注意力把所有词揉成同一个向量</div>
-          <div class="row2">
-            <div class="viz h260" id="r-scatter"></div>
-            <div class="viz h260" id="r-curve"></div>
-          </div>
-          <div class="legend"><span><i style="background:var(--c4)"></i>纯注意力 $\mathbf X_{l+1}=\mathbf A_l\mathbf X_l\mathbf W_V$</span><span><i style="background:var(--c1)"></i>加残差 $\mathbf X_{l+1}=\mathbf X_l+\mathbf A_l\operatorname{Norm}(\mathbf X_l)\mathbf W_V$</span></div>
-          <div class="caption">散点：第 $l$ 层 8 个词向量在初始主成分平面上的投影（按整体 RMS 缩放）。曲线：相对残差 $\|\mathbf X-\mathbf 1\bar{\mathbf x}^\top\|_F/\|\mathbf X\|_F$，即到“所有行都相同”的秩 1 矩阵的距离。落到 $10^{-16}$ 就是 float64 的机器精度。</div>
+          <div class="card-title"><span class="dot" style="background:var(--c3)">⊕</span>把 $\mathbf x$ 送进一层“RMSNorm + SwiGLU + 残差”</div>
+          <div style="overflow-x:auto"><table class="data" id="t-table"></table></div>
+          <p class="small muted" style="margin:0">书中 $\mathbf x=(3,4)$：$\operatorname{RMS}=\sqrt{12.5}\approx3.5355$，$\hat{\mathbf x}\approx(0.8485,1.1314)$，门控 $\mathbf z\approx(1,0)$、内容 $\mathbf u\approx(2,1)$，第 1 个水龙头开到 $\operatorname{Swish}(1)=0.7311$，第 2 个关死，支线输出 $(1.4622,0)$，加回主干道得 $(4.4622,4.0)$。表中用的是不四舍五入的精确值，末位可能与书中先把 $\mathbf z,\mathbf u$ 取整再手算的结果差 1。</p>
         </div>
-        <div class="stats" id="r-stats"></div>
+        <div class="stats" id="t-stats"></div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
+            <li>在门控曲面上点 $a=-1,\ b=2$（默认位置）：$\operatorname{Swish}(-1)\cdot2\approx-0.538$，对门控的导数 $\operatorname{Swish}'(-1)\cdot2\approx0.145$，对内容的导数 $\operatorname{Swish}(-1)\approx-0.269$，两条支路都还活着（书中 7.3 节）。</li>
             <li>把 $\beta$ 拖到 0 再拖到 10：Swish 从直线 $z/2$ 一路变成 ReLU。$\beta=1$ 时最低点约为 $-0.278$（在 $z\approx-1.278$ 处）。</li>
             <li>勾选导数：ReLU 在负半轴导数恒为 0（神经元坏死），Swish 和 GELU 的导数在负半轴仍有一点点，梯度还能传回去。</li>
             <li>在门控曲面上点 $a&lt;-3$ 的区域：不管内容 $b$ 多大，输出都接近 0，门被拧死了。</li>
-            <li>看秩坍缩的残差曲线：纯注意力的残差按“指数的指数”掉到机器精度，大约 4 层就把 8 个词揉成一个；加上残差后几十层仍保留差异。调大锐度 $\tau$ 能拖慢但挡不住坍缩。</li>
+            <li>在“手算一层”里把 $x_2$ 拖来拖去：第 2 个水龙头始终关死，支线第 2 维输出恒为 0，但主干道上的 $x_2$ 原样传到下一层，这就是残差直通车的保底作用。</li>
           </ol>
         </div>
       </div>

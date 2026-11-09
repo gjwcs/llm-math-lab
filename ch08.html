@@ -5,22 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>第 8 章 · 在线实验室</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="assets/lab.css">
+<link rel="stylesheet" href="assets/lab.css?v=20261110">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-<script defer src="assets/lab.js"></script>
+<script defer src="assets/lab.js?v=20261110"></script>
 <script defer src="ch08.js"></script>
 </head>
 <body data-chapter="8">
 <main class="container">
 
   <!-- ========================= 实验 1 ========================= -->
-  <section class="experiment" id="router" data-title="Top-k 路由与负载均衡">
+  <section class="experiment" id="router" data-title="分诊台与负载均衡">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">1</span>分诊台参数</div>
         <div class="btn-row" style="margin-top:0">
-          <button class="btn amber" id="m-book">书中 4 专家 Top-2 算例</button>
+          <button class="btn amber" id="m-book">书中分诊台算例</button>
           <button class="btn ghost" id="m-random">随机批次</button>
         </div>
         <div id="m-E"></div>
@@ -48,24 +48,36 @@
           <div class="card">
             <div class="card-title"><span class="dot" style="background:var(--c2)">f</span>各专家负载</div>
             <div class="viz h260" id="m-load"></div>
-            <div class="legend"><span><i style="background:var(--c2)"></i>实际接单比例 $f_i$</span><span><i style="background:var(--c1)"></i>平均路由概率 $P_i$</span><span><i style="background:var(--slate);height:2px"></i>均匀值 $k/E$、$1/E$</span></div>
+            <div class="legend"><span><i style="background:var(--c2)"></i>实际接单比例 $f_i$</span><span><i style="background:var(--c1)"></i>平均路由概率 $P_i$</span><span><i style="background:var(--slate);height:2px"></i>均匀值 $1/E$</span></div>
           </div>
           <div class="card">
             <div class="card-title"><span class="dot" style="background:var(--c6)">b</span>偏置更新轨迹</div>
             <div class="viz h260" id="m-hist"></div>
-            <div class="legend"><span><i style="background:var(--c4)"></i>最大负载 / 平均负载</span><span><i style="background:var(--c5)"></i>$\mathcal L_{\text{aux}}/k$</span></div>
+            <div class="legend"><span><i style="background:var(--c4)"></i>最大负载 / 平均负载</span><span><i style="background:var(--c5)"></i>$\mathcal L_{\text{aux}}$（理想值 1）</span></div>
           </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c5)">2</span>2 位医生的拥堵罚款（书中 8.2 节）<span class="sub">取 $f_i=P_i$</span></div>
+          <div class="row2">
+            <div>
+              <div id="p-P1"></div>
+              <div class="formula" id="p-formula"></div>
+            </div>
+            <div class="viz h260" id="p-plot"></div>
+          </div>
+          <p class="small muted" style="margin:0">$\mathcal L_{\text{aux}}=2(f_1P_1+f_2P_2)=2\big(P_1^2+(1-P_1)^2\big)=4\big(P_1-\tfrac12\big)^2+1\ge1$：各接一半时罚得最少，九成挤 1 号罚 $1.64$，全挤 1 号罚 $2.00$。</p>
         </div>
         <div class="card" id="m-hand-card">
           <div class="card-title"><span class="dot" style="background:var(--amber)">✎</span>逐项算出 $\mathcal L_{\text{aux}}$</div>
           <div style="overflow-x:auto"><table class="data" id="m-table"></table></div>
-          <div class="formula">$$\mathcal{L}_{\text{aux}} = \alpha \, E \sum_{i=1}^{E} f_i \cdot P_i,\qquad f_i = \frac{1}{T}\sum_{t=1}^T \mathbb{I}(i \in \operatorname{TopK}_t),\qquad P_i = \frac{1}{T}\sum_{t=1}^T p_{t,i}$$</div>
-          <p class="small muted">表中取 $\alpha=1$。$\sum_i f_i=k$、$\sum_i P_i=1$，当且仅当 $f_i=k/E,\;P_i=1/E$ 时 $E\sum_i f_iP_i$ 取到最小值 $k$。反向传播时 $f_i$ 当作常数，$P_i$ 受到的下压力度 $\propto E f_i$：接单越多，罚得越狠。无辅助损失方案只在选 Top-$k$ 时用 $s_i+b_i$，加权时仍用原始概率，所以 $P_i$ 不变而 $f_i$ 被拉平。</p>
+          <div class="formula">$$\mathcal{L}_{\text{aux}} = \alpha \, E \sum_{i=1}^{E} f_i \cdot P_i,\qquad f_i = \frac{1}{Tk}\sum_{t=1}^T \mathbb{I}(i \in \operatorname{TopK}_t),\qquad P_i = \frac{1}{T}\sum_{t=1}^T p_{t,i}$$</div>
+          <p class="small muted">表中取 $\alpha=1$，与书中式 (8.2) 一样按 $Tk$ 归一化，于是 $\sum_i f_i=1$、$\sum_i P_i=1$；在 $f_i=P_i$ 的理想同步情形下，$E\sum_i f_iP_i$ 在 $f_i=P_i=1/E$ 时取到最小值 $1$。反向传播时 $f_i$ 当作常数，$P_i$ 受到的下压力度 $\propto E f_i$：接单越多，罚得越狠。无辅助损失方案只在选 Top-$k$ 时用 $s_i+b_i$，加权时仍用原始概率，所以 $P_i$ 不变而 $f_i$ 被拉平。</p>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>点“书中 4 专家 Top-2 算例”：表格逐项复现 $f=(1,0.5,0.5,0)$、$P=(0.55,0.20,0.15,0.10)$，$\mathcal L_{\text{aux}}=2.90&gt;k=2$。点格子可以改选哪个词元查看门控权重 $0.625/0.375$。</li>
+            <li>点“书中分诊台算例”：一个词 $\mathbf x=(2,1)$，分诊台打分 $\mathbf s=(3,3,-5,-8)$，只叫醒前两名，门控权重各 $0.5$（书中 8.1 节）。</li>
+            <li>在下方“2 位医生的拥堵罚款”里把 $P_1$ 拖到 $0.9$、$1$、$0.5$：罚款依次是 $1.64$、$2.00$、$1.00$，与书中 8.2 节手算一致。</li>
             <li>回到随机批次，把倾斜度拉到 3：一两个“明星专家”包揽大部分词元，好几个专家一单没接（路由坍缩）。</li>
             <li>点“自动更新偏置”：偏置更新轨迹中的最大负载/平均负载很快逼近 1，负载图里的橙色柱子被拉平；但蓝色的 $P_i$ 几乎不动，因为偏置不参与加权。</li>
             <li>把倾斜度调成 0：即使不加任何约束，随机波动也会让负载并不完全均匀，$\mathcal L_{\text{aux}}$ 略高于 $k$。</li>
@@ -76,7 +88,7 @@
   </section>
 
   <!-- ========================= 实验 2 ========================= -->
-  <section class="experiment" id="ssm" data-title="SSM 选择性记忆">
+  <section class="experiment" id="ssm" data-title="Mamba 抗噪备忘录">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">2</span>状态空间模型</div>
@@ -93,6 +105,18 @@
         <div class="caption">$\mathbf A=-\operatorname{diag}(1,2,\dots,N)$（HiPPO 的对角特征值），$\mathbf B=\mathbf 1$，$C_n=n/N$（让稳态增益为 1）。在输入序列图上点按可以添加或删除关键词。</div>
       </div>
       <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c3)">✎</span>书中 4 词算例：密码、嗡嗡、咔嚓、解锁（8.4 节）</div>
+          <div class="row2">
+            <div>
+              <div id="b-a"></div>
+              <div id="b-b"></div>
+              <p class="small muted" style="margin:0">两个滑块只控制下表第二行“固定系数”的老式递推；第一行是 Mamba 按内容现场调节的 $(a_t,b_t)$。</p>
+            </div>
+            <div class="viz h260" id="b-plot"></div>
+          </div>
+          <div style="overflow-x:auto"><table class="data" id="b-table"></table></div>
+        </div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--c2)">x</span>输入序列与步长 $\Delta_t$<span class="sub">点按添加 / 删除关键词</span></div>
           <div class="viz h260" id="s-input" style="touch-action:none; cursor:crosshair"></div>
@@ -113,11 +137,12 @@
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
           <div class="formula">$$\mathbf{h}_t = \overline{\mathbf{A}}_t \mathbf{h}_{t-1} + \overline{\mathbf{B}}_t x_t,\quad y_t = \mathbf{C}_t \mathbf{h}_t,\qquad \overline{\mathbf{A}}_t = \exp(\Delta_t \mathbf{A}),\quad \overline{\mathbf{B}}_t = (\Delta_t \mathbf{A})^{-1}\big(\exp(\Delta_t \mathbf{A}) - \mathbf{I}\big)\Delta_t \mathbf{B}_t$$</div>
           <div class="formula">$$y_t = \sum_{j=1}^t \Big(\prod_{k=j+1}^t \overline{a}_k\Big) (\mathbf{c}_t^\top \mathbf{b}_j)\, x_j,\qquad \mathbf y=\big(\mathbf L\odot(\mathbf C\mathbf B^\top)\big)\mathbf x$$</div>
-          <p class="small muted">对角 $\mathbf A$ 时每个通道独立：$\bar a_n=e^{-\Delta a_n}$，$\bar b_n=(1-e^{-\Delta a_n})/a_n$。$\Delta_t\to0$ 时 $\bar a\to1,\ \bar b\to0$，模型闭上耳朵保留旧记忆；$\Delta_t$ 很大时 $\bar a\to0$，旧记忆被清空，当前输入被整个刻进状态。</p>
+          <p class="small muted">书中式 (8.3) 用的是 Mamba 代码里的简化写法 $\overline{\mathbf B}_t\approx\Delta_t\mathbf B_t$，$\Delta_t$ 很小时与上面的 ZOH 公式一致。对角 $\mathbf A$ 时每个通道独立：$\bar a_n=e^{-\Delta a_n}$，$\bar b_n=(1-e^{-\Delta a_n})/a_n$。$\Delta_t\to0$ 时 $\bar a\to1,\ \bar b\to0$，模型闭上耳朵保留旧记忆；$\Delta_t$ 很大时 $\bar a\to0$，旧记忆被清空，当前输入被整个刻进状态。</p>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
+            <li>在书中 4 词算例里把固定系数 $a$ 拖到 0.8、$b$ 保持 1：备忘录变成 $5\to104\to3.2\to4.56$，“密码”的信号只剩 $0.8^3\times5=2.56$，淹没在 $\pm64$ 的噪音里；Mamba 那一行始终是 $5,5,5,6$。</li>
             <li>切到“固定 $\Delta$”（默认 0.15）：每个关键词十几步内就指数衰减殆尽，废话词还在不停往状态里掺噪声。权重图变成一条与内容无关的衰减曲线。</li>
             <li>切到“选择性 $\Delta_t$”：输出 $y_t$ 变成一段段平台，每个关键词被稳稳记住，直到下一个关键词把它覆盖。</li>
             <li>把“关键词的 $\Delta$”调小到 0.3：新关键词写不满状态，新旧记忆混在一起。</li>
@@ -129,7 +154,7 @@
   </section>
 
   <!-- ========================= 实验 3 ========================= -->
-  <section class="experiment" id="wall" data-title="复杂度墙与激活参数">
+  <section class="experiment" id="wall" data-title="两堵墙与激活参数">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">3</span>两堵墙</div>
@@ -167,10 +192,10 @@
           <div style="overflow-x:auto"><table class="data">
             <tr><th>架构模块</th><th>训练总计算</th><th>单步推理</th><th>推理缓存</th></tr>
             <tr><td>Softmax Attention</td><td>$\mathcal O(T^2d)$</td><td>$\mathcal O(Td)$</td><td>$\mathcal O(Td)$</td></tr>
-            <tr><td>Sparse MoE FFN</td><td>$\mathcal O(Tkd_{\text{ff}})$</td><td>$\mathcal O(kd_{\text{ff}})$</td><td>$\mathcal O(Edd_{\text{ff}})$ 常驻参数</td></tr>
+            <tr><td>Sparse MoE FFN</td><td>$\mathcal O(Tkdd_{\text{ff}})$</td><td>$\mathcal O(kdd_{\text{ff}})$</td><td>$\mathcal O(Edd_{\text{ff}})$ 常驻参数</td></tr>
             <tr><td>SSM / Mamba</td><td>$\mathcal O(TNd)$</td><td>$\mathcal O(Nd)$</td><td>$\mathcal O(Nd)$ 常数</td></tr>
           </table></div>
-          <p class="small muted" style="margin-bottom:0">上下文从 4K 扩到 100 万（250 倍）时，$T^2$ 项暴涨 $250^2=62{,}500$ 倍。MoE 不缩小显存里的参数，而是让每个词元只走 $k$ 个专家，用总参数的一小部分完成一次前向。</p>
+          <p class="small muted" style="margin-bottom:0">书中 8.3 节按“握手次数”算：读 $T=10^6$ 个字，注意力累计约 $T^2/2=5\times10^{11}$ 次，备忘录只更新 $10^6$ 次，相差 $5\times10^5$ 倍。上下文从 4K 扩到 100 万（250 倍）时，$T^2$ 项暴涨 $250^2=62{,}500$ 倍。MoE 不缩小显存里的参数，而是让每个词元只走 $k$ 个专家，用总参数的一小部分完成一次前向。</p>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>

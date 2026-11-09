@@ -5,63 +5,71 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>第 2 章 · 在线实验室</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="assets/lab.css">
+<link rel="stylesheet" href="assets/lab.css?v=20261110">
+<style>@media (max-width: 640px) { .card-title { flex-wrap: wrap; } .card-title .sub { margin-left: 32px; flex-basis: 100%; } .stats { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); } }</style>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-<script defer src="assets/lab.js"></script>
+<script defer src="assets/lab.js?v=20261110"></script>
 <script defer src="ch02.js"></script>
 </head>
 <body data-chapter="2">
 <main class="container">
 
   <!-- ========================= 实验 1 ========================= -->
-  <section class="experiment" id="ortho" data-title="高维的正交祝福">
+  <section class="experiment" id="words" data-title="词向量与余弦相似度">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">1</span>参数控制台</div>
-        <p class="small">在 $d$ 维空间里随机抽取 $N$ 个向量，计算所有 $\binom{N}{2}$ 对向量的夹角余弦，看它们离“正交”有多近。</p>
-        <div id="o-d"></div>
-        <div id="o-n"></div>
-        <div id="o-eps"></div>
-        <div class="small muted" style="margin-top:4px">向量的取法：</div>
-        <div id="o-mode" style="margin:6px 0 4px"></div>
-        <div id="o-zoom"></div>
+        <p class="small">书中给三个词各打两项分：横轴 $x_1$ 是“有多像宠物”，纵轴 $x_2$ 是“有多像权力”。在平面上<b>拖动箭头端点</b>改变词向量（坐标对齐到 0.01），再选两个词作为 $\mathbf a$ 和 $\mathbf b$。</p>
+        <div class="small muted">向量 $\mathbf a$：</div>
+        <div class="pill-row" id="w-a" style="margin:6px 0 10px"></div>
+        <div class="small muted">向量 $\mathbf b$：</div>
+        <div class="pill-row" id="w-b" style="margin:6px 0 10px"></div>
         <div class="btn-row">
-          <button class="btn ghost" id="o-resample">重新抽样</button>
+          <button class="btn ghost" id="w-reset">恢复书中坐标</button>
         </div>
+        <div class="caption">书中坐标：猫 $(0.9,0.1)$，狗 $(0.8,0.2)$，国王 $(0.1,0.9)$。</div>
       </div>
       <div class="stack">
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c6)">∠</span><span id="o-title">两两夹角余弦 $\cos\theta$ 的分布</span><span class="sub" id="o-pairs"></span></div>
-          <div class="viz h340" id="o-hist"></div>
-          <div class="legend"><span><i style="background:var(--c1)"></i>实测直方图</span><span id="o-lg1"><i style="background:var(--c4)"></i>精确密度 $\propto(1-t^2)^{(d-3)/2}$</span><span id="o-lg2"><i style="background:var(--c2)"></i>正态近似 $\mathcal N(0,1/d)$</span><span id="o-lg3" style="display:none"><i style="background:var(--c2)"></i>理论分布 $\approx\mathcal N(0,d)$</span></div>
+          <div class="card-title"><span class="dot" style="background:var(--c1)">⟨⟩</span>二维词向量平面<span class="sub">拖动端点 · 虚线为 $\mathbf b$ 在 $\mathbf a$ 上的投影</span></div>
+          <div class="viz sq" id="w-plane" style="max-height:440px"></div>
+          <div class="formula" id="w-calc"></div>
         </div>
-        <div class="stats" id="o-stats"></div>
-        <div class="row2">
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c1)">σ</span>标准差随维度的变化</div>
-            <div class="viz h260" id="o-std"></div>
-            <div class="caption">点为实测，虚线为理论值。对数坐标下斜率恰好是 $-\tfrac12$（或 $+\tfrac12$）。</div>
+        <div class="stats" id="w-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c3)">3D</span>国王 − 男人 + 女人 ≈ 王后<span class="sub">三个维度：皇室权力度 · 男性特征度 · 女性特征度</span></div>
+          <div style="overflow-x:auto"><table class="data" id="w-table" style="white-space:nowrap"></table></div>
+          <div class="btn-row"><button class="btn ghost" id="w-book3">恢复书中打分</button></div>
+          <div class="caption" id="w-an-out"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c4)">○</span>单位向量：距离与余弦是同一枚硬币的两面<span class="sub">习题 2.1</span></div>
+          <div class="row2">
+            <div>
+              <div class="small muted">$\mathbf u=(1,0,0)$，$\mathbf v$ 取：</div>
+              <div id="u-preset" style="margin:6px 0 2px"></div>
+              <div id="u-theta"></div>
+              <div class="stats" id="u-stats"></div>
+            </div>
+            <div><div class="viz h260" id="u-plot"></div></div>
           </div>
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--coral)">P</span>“不够正交”的概率 $\mathbb P(|\cos\theta|\ge\varepsilon)$</div>
-            <div class="viz h260" id="o-tail"></div>
-            <div class="legend"><span><i style="background:var(--c4)"></i>精确值</span><span><i style="background:var(--c2)"></i>上界 $2e^{-d\varepsilon^2/2}$</span><span><i style="background:var(--c1)"></i>实测</span></div>
-          </div>
+          <div class="formula" id="u-calc"></div>
+          <div class="caption">右图画的是 $\mathbf u$ 和 $\mathbf v$ 张成的那张平面：两根单位箭头的端点都在单位圆上，红色弦长就是 $\|\mathbf u-\mathbf v\|$。</div>
         </div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-          <div class="formula">$$\mathbb{E}\big[\langle \mathbf{u}, \mathbf{v} \rangle\big] = 0,\qquad \operatorname{Var}\big(\langle \mathbf{u}, \mathbf{v} \rangle\big) = \frac{1}{d},\qquad \mathbb{P}\!\Big(\big|\langle \mathbf{u}, \mathbf{v} \rangle\big| \ge \varepsilon\Big) \le 2 \exp\!\left(-\frac{d \varepsilon^2}{2}\right)$$</div>
-          <div class="explain">设 $u_k, v_k$ 独立、均值为 $0$、方差为 $\frac1d$，每一项乘积的方差是 $\frac1d\cdot\frac1d=\frac1{d^2}$，$d$ 项加起来方差就是 $\frac1d$。所以 $d=4096$ 时标准差只有 $\frac1{64}\approx0.0156$，随手抓两个向量，夹角几乎都在 $90^\circ$ 附近。</div>
-          <p class="small muted">若分量改用方差为 $1$ 的 $\mathcal N(0,1)$（不归一化），内积方差变成 $d$，随维度线性膨胀。这正是第 5 章注意力必须除以 $\sqrt{d_k}$ 的伏笔。</p>
+          <div class="formula">$$\mathbf a\cdot\mathbf b=\sum_{k=1}^{d}a_kb_k=\|\mathbf a\|\,\|\mathbf b\|\cos\theta,\qquad \cos\theta=\frac{\mathbf a\cdot\mathbf b}{\|\mathbf a\|\,\|\mathbf b\|}$$</div>
+          <div class="formula">$$\|\mathbf u\|=\|\mathbf v\|=1\ \Longrightarrow\ \|\mathbf u-\mathbf v\|^2=\|\mathbf u\|^2+\|\mathbf v\|^2-2\,\mathbf u\cdot\mathbf v=2(1-\cos\theta)$$</div>
+          <div class="explain">内积是一场“逐项对暗号”：两个词在同一维上都打高分，乘出来的数就大。它同时取决于<b>箭头多长</b>（模长）和<b>方向多一致</b>（$\cos\theta$）；除以两个模长，就只剩方向。把向量都缩成长度 1 之后，“内积越大”和“距离越近”完全是一回事。</div>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>把 $d$ 从 2 慢慢拖到 4096：直方图从两头高的 U 形，坍缩成一根钉在 $\cos\theta=0$ 的细针。</li>
-            <li>令 $d=3$：分布恰好是 $[-1,1]$ 上的均匀分布（阿基米德“帽盒定理”），这时精确密度是一条水平线。</li>
-            <li>取 $d=4096$、$\varepsilon=0.1$：上界 $2e^{-20.48}\approx2.5\times10^{-9}$，几千对向量里一对“不够正交”的也找不到。</li>
-            <li>切换到“未归一化”：标准差变成 $\sqrt d$，$d=4096$ 时内积动辄 $\pm 100$。想想把它直接送进 Softmax 会怎样。</li>
+            <li>选 $\mathbf a=$ 猫、$\mathbf b=$ 狗：内积 $0.9\times0.8+0.1\times0.2=0.74$，模长 $\sqrt{0.82}\approx0.9055$ 和 $\sqrt{0.68}\approx0.8246$，余弦 $0.9910$，夹角只有 $7.7^\circ$。</li>
+            <li>把 $\mathbf b$ 换成国王：内积 $0.18$，余弦 $0.18/0.82\approx0.2195$，夹角 $77.3^\circ$。</li>
+            <li>把狗从 $(0.8,0.2)$ 拖到 $(1.2,0.3)$：方向没变，余弦仍是 $0.9910$，内积却从 $0.74$ 涨到 $1.11$。模长也会“刷分”。</li>
+            <li>类比表：$\text{国王}-\text{男人}+\text{女人}=(0.94,0.02,0.93)$，与王后的余弦 $0.9997$。单位圆：$\mathbf v_1$ 给出 $\mathbf u\cdot\mathbf v=0.8$、$\|\mathbf u-\mathbf v\|^2=0.40=2(1-0.8)$；$\mathbf v_2$ 给出 $0$ 和 $2.00$。</li>
           </ol>
         </div>
       </div>
@@ -69,55 +77,58 @@
   </section>
 
   <!-- ========================= 实验 2 ========================= -->
-  <section class="experiment" id="words" data-title="词向量与余弦相似度">
+  <section class="experiment" id="coin" data-title="扔硬币造随机箭头">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">2</span>参数控制台</div>
-        <p class="small">在平面上<b>拖动箭头端点</b>改变词向量。选两个词作为 $\mathbf a$ 和 $\mathbf b$，看内积、模长与夹角如何联动。</p>
-        <div class="small muted">词组：</div>
-        <div id="w-set" style="margin:6px 0 10px"></div>
-        <div class="small muted">向量 $\mathbf a$：</div>
-        <div class="pill-row" id="w-a" style="margin:6px 0 10px"></div>
-        <div class="small muted">向量 $\mathbf b$：</div>
-        <div class="pill-row" id="w-b" style="margin:6px 0 10px"></div>
-        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
-        <div class="small muted">向量类比 $\mathbf x_1-\mathbf x_2+\mathbf x_3\approx\ ?$</div>
-        <div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:6px;align-items:center;margin-top:6px">
-          <select id="w-an1"></select><span>−</span><select id="w-an2"></select><span>+</span><select id="w-an3"></select>
-        </div>
+        <p class="small">在 $d$ 维空间里造 $N$ 根随机箭头，算出所有 $\binom{N}{2}$ 对的夹角余弦。书中的造法：每个坐标扔一次硬币，正面填 $+1/\sqrt d$，反面填 $-1/\sqrt d$，箭头长度恰好是 1。</p>
+        <div class="small muted">书中的维度：</div>
+        <div id="o-preset" style="margin:6px 0 2px"></div>
+        <div id="o-d"></div>
+        <div id="o-n"></div>
+        <div class="small muted" style="margin-top:4px">箭头的造法：</div>
+        <div id="o-mode" style="margin:6px 0 4px"></div>
+        <div id="o-zoom"></div>
         <div class="btn-row">
-          <button class="btn teal" id="w-analogy">国王 − 男人 + 女人 = ?</button>
-          <button class="btn ghost" id="w-reset">复原位置</button>
+          <button class="btn ghost" id="o-resample">重新扔一遍硬币</button>
         </div>
-        <div id="w-analogy-out" class="small" style="margin-top:8px"></div>
       </div>
       <div class="stack">
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c1)">⟨⟩</span>二维词向量平面<span class="sub">拖动端点 · 虚线为 $\mathbf b$ 在 $\mathbf a$ 上的投影</span></div>
-          <div class="viz h420" id="w-plane"></div>
+          <div class="card-title"><span class="dot" style="background:var(--c6)">∠</span><span id="o-title">两两夹角余弦 $\cos\theta$ 的分布</span><span class="sub" id="o-pairs"></span></div>
+          <div class="viz h340" id="o-hist"></div>
+          <div class="legend"><span><i style="background:var(--c1)"></i>实测</span><span id="o-lg1"><i style="background:var(--c4)"></i><span id="o-lg1t">精确概率</span></span><span><i style="background:var(--c2)"></i>正态近似</span><span><i style="background:var(--c1l)"></i>$\pm1\sigma$ 带</span><span><i style="background:#EEF3FA"></i>$\pm3\sigma$ 带</span></div>
+          <div class="caption" id="o-cap"></div>
         </div>
-        <div class="stats" id="w-stats"></div>
-        <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c3)">3D</span>三维特征打分：$[\text{体型大小},\ \text{亲人程度},\ \text{机械属性}]$</div>
-          <div style="overflow-x:auto"><table class="data" id="w-table"></table></div>
-          <div class="btn-row">
-            <button class="btn ghost" id="w-book3">书中开篇的打分</button>
-            <button class="btn ghost" id="w-hand">书中手算算例 (1,2,2)…</button>
+        <div class="stats" id="o-stats"></div>
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c1)">σ</span>标准差随维度的变化</div>
+            <div class="viz h260" id="o-std"></div>
+            <div class="caption">点为实测，虚线为理论值。对数坐标下是一条斜率 $-\tfrac12$ 的直线（未归一化时是 $+\tfrac12$）。</div>
           </div>
-          <div class="caption" id="w-cap">直接修改表格中的数字。右侧是两两余弦相似度（括号内为夹角）。</div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c5)">h</span>叠加读数（习题 2.4）</div>
+            <div id="s-eps"></div>
+            <div class="viz h260" id="s-plot"></div>
+            <div class="stats" id="s-stats" style="margin-top:10px"></div>
+          </div>
         </div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-          <div class="formula">$$\langle \mathbf{a}, \mathbf{b} \rangle = \mathbf{a}^\top \mathbf{b} = \sum_{k=1}^{d} a_k b_k = \|\mathbf{a}\|_2 \|\mathbf{b}\|_2 \cos\theta, \qquad \cos\theta = \frac{\mathbf{a}^\top \mathbf{b}}{\|\mathbf{a}\|_2 \|\mathbf{b}\|_2}$$</div>
-          <div class="explain">内积是一场“逐项对暗号”：同号的维度加分，异号的维度扣分。几何上它同时取决于<b>箭头多长</b>（模长）和<b>方向多一致</b>（$\cos\theta$）。单位球面上 $\|\mathbf a-\mathbf b\|_2^2=2(1-\mathbf a^\top\mathbf b)$，最小化距离与最大化内积完全等价。</div>
+          <div class="formula">$$\mathbf u\cdot\mathbf v=\sum_{i=1}^{d}u_iv_i,\qquad \mathbb{E}[\mathbf u\cdot\mathbf v]=0,\qquad \operatorname{Var}(\mathbf u\cdot\mathbf v)=d\cdot\frac1d\cdot\frac1d=\frac1d,\qquad \operatorname{Std}(\mathbf u\cdot\mathbf v)=\frac{1}{\sqrt d}$$</div>
+          <div class="formula">$$\text{未归一化 } q_i,k_i=\pm1:\quad \operatorname{Var}(\mathbf q\cdot\mathbf k)=d,\qquad \operatorname{Std}(\mathbf q\cdot\mathbf k)=\sqrt d$$</div>
+          <div class="formula">$$\mathbf h=3\mathbf e_1+5\mathbf e_2,\quad \mathbf e_1\cdot\mathbf e_2=\varepsilon\ \Longrightarrow\ \mathbf e_1\cdot\mathbf h=3+5\varepsilon,\qquad \mathbf e_2\cdot\mathbf h=3\varepsilon+5$$</div>
+          <div class="explain">每一项 $u_iv_i$ 都是 $+\frac1d$ 或 $-\frac1d$，像两个人各自闭眼扔硬币答是非题：一半蒙得一样，一半蒙得相反，$d$ 项一抵消，只剩 $\pm\frac{1}{\sqrt d}$ 的小尾巴。按正态近似，$\pm1\sigma$ 只罩住约 68% 的点对，$\pm3\sigma$ 罩住约 99.7%，几乎全部。</div>
+          <p class="small muted">维度小时，扔硬币向量的余弦只能取离散的几个值（$d=4$ 时只有 $-1,-0.5,0,0.5,1$），这时直方图画成一根根竖条，红点是二项分布给出的精确概率。</p>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>把 $\mathbf a$ 拖长一倍：$\cos\theta$ 纹丝不动，内积却翻倍。注意力用的是不归一化的内积，模长也会“刷分”。</li>
-            <li>点“国王 − 男人 + 女人”：平行四边形的第四个顶点落在“王后”附近。再把“女人”拖走，类比还成立吗？</li>
-            <li>在三维表格里点“书中手算算例”：$\cos(\text{猫},\text{狗})=8/9\approx0.889$，而猫与汽车恰好正交。</li>
-            <li>把“猫”和“拖拉机”拖到互相垂直，内积变成 $0$，代表两者“井水不犯河水”。</li>
+            <li>点 $d=4$：余弦只能取 $-1,-0.5,0,0.5,1$ 五个值，标准差 $1/\sqrt4=0.50$，$\pm1\sigma$ 夹角带是 $60^\circ$ 到 $120^\circ$，随手抓两根经常“撞车”。</li>
+            <li>依次点 $100$、$1000$、$4096$：标准差 $0.10$、$0.0316$、$0.0156$；$\pm1\sigma$ 夹角带收紧到 $84^\circ$–$96^\circ$、再到 $89.1^\circ$–$90.9^\circ$。勾选“放大”看清形状。</li>
+            <li>$d=4096$ 时看 $\pm3\sigma$：$|\cos\theta|\le0.047$，也就是 $87.3^\circ$–$92.7^\circ$，实测几乎所有点对都在里面；$\pm1\sigma$ 只罩住约 68%。</li>
+            <li>切到“未归一化 $\pm1$”：内积标准差变成 $\sqrt d$，$d=4096$ 时是 $64$。叠加读数取 $\varepsilon=0.02$：$\mathbf e_1\cdot\mathbf h=3.10$，$\mathbf e_2\cdot\mathbf h=5.06$。</li>
           </ol>
         </div>
       </div>
@@ -125,65 +136,62 @@
   </section>
 
   <!-- ========================= 实验 3 ========================= -->
-  <section class="experiment" id="curse" data-title="维度诅咒与 JL 引理">
+  <section class="experiment" id="melon" data-title="西瓜皮与除以 √d">
     <div class="lab-grid">
       <div class="card controls">
-        <div class="card-title"><span class="dot">3</span>维度诅咒</div>
-        <div id="c-d"></div>
-        <div id="c-eps"></div>
-        <div id="c-n"></div>
-        <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
-        <div class="card-title" style="margin-bottom:4px"><span class="dot" style="background:var(--leaf)">JL</span>随机投影保距</div>
-        <p class="small muted" style="margin:0">把 $M$ 个 $D=1000$ 维的点用高斯矩阵 $\mathbf P$（元素 $\sim\mathcal N(0,1/k)$）投影到 $k$ 维。</p>
-        <div id="c-M"></div>
-        <div id="c-k"></div>
-        <div id="c-jeps"></div>
-        <div class="btn-row"><button class="btn ghost" id="c-resample">重新抽样</button></div>
+        <div class="card-title"><span class="dot">3</span>参数控制台</div>
+        <div class="small muted"><b>高维西瓜</b>：半径为 1，最外面一圈是皮。书中的维度 $d$：</div>
+        <div id="m-preset" style="margin:6px 0 2px"></div>
+        <div id="m-d"></div>
+        <div id="m-eps"></div>
+        <div class="btn-row"><button class="btn ghost" id="m-resample">重新抽样向量长度</button></div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <div class="small muted"><b>注意力打分</b>：一个打分是典型大小 $S_1=+\sqrt d$，另一个 $S_2=0$</div>
+        <div id="s-preset" style="margin:6px 0 2px"></div>
+        <div id="s-d"></div>
       </div>
       <div class="stack">
-        <div class="row2">
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c4)">◎</span>单位球的体积挤在表皮</div>
-            <div class="viz h260" id="c-radial"></div>
-            <div class="caption">半径 $r$ 处的体积密度 $d\,r^{d-1}$，阴影为厚度 $\varepsilon$ 的外壳。</div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c4)">◎</span>高维西瓜只剩皮<span class="sub" id="m-sub"></span></div>
+          <div class="row2">
+            <div><div class="viz h260" id="m-pic"></div></div>
+            <div><div class="viz h260" id="m-curve"></div></div>
           </div>
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c4)">%</span>外壳体积占比 $1-(1-\varepsilon)^d$</div>
-            <div class="viz h260" id="c-shell"></div>
-            <div class="caption">三条曲线分别是 $\varepsilon=0.01$、当前 $\varepsilon$、$0.1$。</div>
-          </div>
+          <div class="caption">左图：切开的西瓜，红色瓜瓤的半径是 $1-\varepsilon$；右侧色条是 $d$ 维空间里瓜瓤和瓜皮各占的体积。右图：瓜瓤占比 $(1-\varepsilon)^d$ 随维度变化（纵轴是 10 的几次方）。</div>
         </div>
-        <div class="stats" id="c-stats"></div>
-        <div class="row2">
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c1)">D</span>距离集中：所有点对距离 / 平均距离</div>
-            <div class="viz h260" id="c-dist"></div>
-            <div class="caption">$n$ 个点均匀撒在 $[0,1]^d$。高维时直方图收缩成一根针：最近和最远几乎一样远。</div>
-          </div>
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c1)">↘</span>相对反差 $(D_{\max}-D_{\min})/D_{\min}$</div>
-            <div class="viz h260" id="c-contrast"></div>
-            <div class="caption">反差趋于 0，“最近邻”失去意义。虚线是 $\propto 1/\sqrt d$ 的参考斜率。</div>
-          </div>
+        <div class="stats" id="m-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">‖x‖</span>随机向量的长度几乎都等于 $\sqrt d$<span class="sub" id="n-sub"></span></div>
+          <div class="viz h260" id="n-hist"></div>
+          <div class="caption">每个坐标是均值 0、方差 1 的随机数（标准正态），抽 1500 根 $d$ 维向量，画出 $\|\mathbf x\|/\sqrt d$ 的分布。维度越高，越紧地挤在 1 附近：高维向量几乎都站在半径 $\sqrt d$ 的薄球壳上。若坐标取 $\pm1$，长度恰好就是 $\sqrt d$。</div>
         </div>
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--leaf)">JL</span>随机投影后距离的畸变 $\|\mathbf P\mathbf u_i-\mathbf P\mathbf u_j\|^2/\|\mathbf u_i-\mathbf u_j\|^2$</div>
-          <div class="viz h260" id="c-jl"></div>
-          <div class="caption">绿色带为 $[1-\varepsilon,\,1+\varepsilon]$。畸变比服从 $\chi^2_k/k$，标准差 $\sqrt{2/k}$，与原始维度 $D$ 无关。</div>
+          <div class="card-title"><span class="dot" style="background:var(--coral)">÷</span>不除以 $\sqrt d$，Softmax 当场卡死<span class="sub" id="s-sub"></span></div>
+          <div class="viz h260" id="s-bars"></div>
+          <div style="overflow-x:auto"><table class="data" id="s-table" style="margin-top:8px;white-space:nowrap"></table></div>
+          <div class="caption">斜率 $Q_1(1-Q_1)$ 是 Softmax 对打分的导数，它决定了反向传播能传回多少梯度。不缩放时它几乎是 0，模型学不动；除以 $d$ 又缩过了头，两个词几乎五五开，分不出好坏。</div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c3)">4D</span>4 维手算：苹果、香蕉、汽车（§2.4）<span class="sub">点表格里的 ±1 可以翻转符号</span></div>
+          <div style="overflow-x:auto"><table class="data" id="f-table" style="white-space:nowrap"></table></div>
+          <div class="btn-row"><button class="btn ghost" id="f-book">恢复书中向量</button></div>
+          <div class="viz h260" id="f-bars" style="margin-top:10px"></div>
+          <div class="legend"><span><i style="background:var(--c4)"></i>不缩放 $\operatorname{Softmax}(\mathbf q\cdot\mathbf k)$</span><span><i style="background:var(--c3)"></i>除以 $\sqrt4=2$ 之后</span></div>
+          <div class="formula" id="f-calc"></div>
         </div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-          <div class="formula">$$\frac{\operatorname{Vol}(\text{外壳})}{\operatorname{Vol}(\text{球})}=1-(1-\varepsilon)^d\xrightarrow{d\to\infty}1,\qquad \frac{D_{\max}-D_{\min}}{D_{\min}}\xrightarrow{d\to\infty}0$$</div>
-          <div class="formula">$$d \ge \frac{8 \ln M}{\varepsilon^2} \implies (1-\varepsilon)\|\mathbf{u}_i - \mathbf{u}_j\|_2^2 \le \|\mathbf{P}\mathbf{u}_i - \mathbf{P}\mathbf{u}_j\|_2^2 \le (1+\varepsilon)\|\mathbf{u}_i - \mathbf{u}_j\|_2^2$$</div>
-          <div class="explain">维度高了，体积几乎全在表皮、距离几乎全都一样，这是<b>诅咒</b>：网格、最近邻这类方法在高维失灵。同一枚硬币的另一面是<b>祝福</b>：JL 引理说保持 $M$ 个点的两两距离只需 $\mathcal O(\varepsilon^{-2}\ln M)$ 维，维度只随 $\ln M$ 增长。</div>
+          <div class="formula">$$\frac{V_{\text{瓜瓤}}}{V_{\text{总体积}}}=(1-\varepsilon)^d,\qquad \mathbb E\|\mathbf x\|^2=\sum_{i=1}^{d}\mathbb E[x_i^2]=d\ \Longrightarrow\ \|\mathbf x\|\approx\sqrt d$$</div>
+          <div class="formula">$$\operatorname{Var}(\mathbf q\cdot\mathbf k)=\sum_{i=1}^{d}\operatorname{Var}(q_ik_i)=d,\qquad \operatorname{Var}\Big(\frac{\mathbf q\cdot\mathbf k}{\sqrt d}\Big)=\frac{d}{d}=1$$</div>
+          <div class="explain">把半径缩到 $0.9$ 倍，$d$ 个方向都要乘一次 $0.9$，所以瓜瓤只剩 $(0.9)^d$。同样的“$d$ 项相加”让内积的方差涨到 $d$、典型大小涨到 $\sqrt d$；除以 $\sqrt d$ 正好把它拉回 1，Softmax 才不会饱和。</div>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>$\varepsilon=0.01$（只削掉 1% 的半径）、$d=4096$：外壳里装了多少体积？答案几乎是 100%。</li>
-            <li>把 $d$ 从 1 拖到 4096，看距离直方图如何收缩，相对反差如何一路下降。</li>
-            <li>JL 部分取 $\varepsilon=0.2$：理论要求 $k\ge 16\ln M/\varepsilon^2$，可实测往往在小得多的 $k$ 下就已全部落在绿带里，界是保守的。</li>
-            <li>把 $M$ 从 20 拉到 200（点数 10 倍），所需维度只多了约 $16\ln 10/\varepsilon^2$，这就是“对数增长”。</li>
+            <li>依次点 $d=1,2,3,100$：瓜瓤占 $90\%$、$81\%$、$72.9\%$、$0.002656\%$；再点 $4096$，只剩约 $10^{-187.4}$。</li>
+            <li>拖动维度看长度直方图：$d$ 越大，$\|\mathbf x\|/\sqrt d$ 越紧地挤在 1 附近。</li>
+            <li>注意力取 $d=4096$：不缩放时 $Q_1=1-1.6\times10^{-28}$、斜率几乎为 0；除以 $\sqrt d$ 后 $\tilde S_1=1$，$Q_1=0.731$、$Q_2=0.269$，斜率 $0.197$；除以 $d$ 只剩 $64/4096=0.0156$，几乎均匀。</li>
+            <li>4 维算例：原始打分 $(4,2,0)$ 给出 $(0.867,0.117,0.016)$；除以 $\sqrt4=2$ 后变成 $(2,1,0)$，权重 $(0.665,0.245,0.090)$。$\cos(\text{苹果},\text{香蕉})=0.50$（$60^\circ$），$\cos(\text{苹果},\text{汽车})=0$（$90^\circ$）。</li>
           </ol>
         </div>
       </div>

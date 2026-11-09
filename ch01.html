@@ -5,59 +5,76 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>第 1 章 · 在线实验室</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="assets/lab.css">
+<link rel="stylesheet" href="assets/lab.css?v=20261110">
+<style>@media (max-width: 640px) { .card-title { flex-wrap: wrap; } .card-title .sub { margin-left: 32px; flex-basis: 100%; } .stats { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); } }</style>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-<script defer src="assets/lab.js"></script>
+<script defer src="assets/lab.js?v=20261110"></script>
 <script defer src="ch01.js"></script>
 </head>
 <body data-chapter="1">
 <main class="container">
 
   <!-- ========================= 实验 1 ========================= -->
-  <section class="experiment" id="next-token" data-title="下一个词的概率与罚单">
+  <section class="experiment" id="penalty" data-title="罚单、熵与 KL 散度">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">1</span>参数控制台</div>
-        <div class="explain kai">“因为今天一直在下暴雨，地面非常湿滑，所以李明出门时特意带了<b>＿＿</b>。”</div>
-        <div class="small muted">拖动每个候选词的原始打分（Logit）：</div>
-        <div id="logit-sliders"></div>
-        <div id="tau-slider"></div>
-        <div id="eps-slider"></div>
-        <div class="small muted" style="margin-top:6px">人类真正写下的词（真实答案 $w_t^*$）：</div>
-        <div class="pill-row" id="truth-pills" style="margin-top:6px"></div>
-        <div class="btn-row">
-          <button class="btn ghost" id="btn-uniform">全部均匀（最困惑）</button>
-          <button class="btn ghost" id="btn-sharp">押中正确答案</button>
-        </div>
+        <div class="small muted"><b>A · 只有一个标准答案</b></div>
+        <div class="explain kai" style="margin:6px 0 8px">“太阳从<b>＿＿</b>边升起。”标准答案 $w^*=$“东”。</div>
+        <div class="small muted">$Q(\text{东})$ 的书中取值：</div>
+        <div id="a-preset" style="margin:6px 0 2px"></div>
+        <div id="a-q"></div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <div class="small muted"><b>B · 两个词“甲”和“乙”</b></div>
+        <div id="b-preset" style="margin:6px 0 2px"></div>
+        <div id="b-p"></div>
+        <div id="b-q"></div>
       </div>
       <div class="stack">
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c1)">P</span>Softmax 输出的预测分布 $Q_\theta(w_t\mid w_{&lt;t})$<span class="sub">绿色 = 真实答案</span></div>
-          <div class="viz h300" id="bars"></div>
+          <div class="card-title"><span class="dot" style="background:var(--coral)">A</span>给标准答案“东”开罚单<span class="sub" id="a-sub"></span></div>
+          <div class="row2">
+            <div><div class="viz h260" id="a-pen"></div></div>
+            <div><div class="viz h260" id="a-grad"></div></div>
+          </div>
+          <div class="legend"><span><i style="background:var(--c4)"></i>交叉熵：罚单 $-\ln Q$，传给 logit 的梯度 $Q-1$</span><span><i style="background:var(--c1)"></i>平方误差：罚单 $\tfrac12(1-Q)^2$，梯度 $-(1-Q)\cdot Q(1-Q)$</span></div>
         </div>
-        <div class="stats" id="stats1"></div>
-        <div class="row2">
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--coral)">L</span>交叉熵罚单 $-\ln Q(w_t^*)$</div>
-            <div class="viz h260" id="ce-curve"></div>
-            <div class="caption">红点是当前模型给真实答案押的概率。越靠左，罚金和梯度越大。</div>
+        <div class="stats" id="a-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c5)">B</span>平均罚单 $H(P,Q)$ 在 $q=p$ 处最低<span class="sub" id="b-sub"></span></div>
+          <div class="viz h300" id="b-plot"></div>
+          <div class="legend"><span><i style="background:var(--c4)"></i>平均罚单 $H(P,Q)=-p\ln q-(1-p)\ln(1-q)$</span><span><i style="background:var(--c5)"></i>底线 $H(P)$</span><span><i style="background:var(--c2)"></i>冤枉分 $D_{\text{KL}}(P\|Q)$</span><span><i style="background:var(--c1)"></i>反向 $D_{\text{KL}}(Q\|P)$（虚线）</span></div>
+        </div>
+        <div class="stats" id="b-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">C</span>温度改变概率表与熵<span class="sub">习题 1.2</span></div>
+          <div class="row2">
+            <div>
+              <div class="small muted">两个候选词，原始打分 $\mathbf z=(\ln 4,\ 0)$：</div>
+              <div id="c-preset" style="margin:6px 0 2px"></div>
+              <div id="c-T"></div>
+              <div class="stats" id="c-stats"></div>
+            </div>
+            <div>
+              <div class="viz h260" id="c-plot"></div>
+              <div class="legend"><span><i style="background:var(--c1)"></i>$Q_1$</span><span><i style="background:var(--c2)"></i>$Q_2$</span><span><i style="background:var(--c5)"></i>熵 $H(Q)$（虚线）</span></div>
+            </div>
           </div>
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-            <div class="formula">$$\mathcal{L}_{\text{CE}} = -\sum_{w\in\mathcal V} P(w\mid w_{&lt;t})\,\ln Q_\theta(w\mid w_{&lt;t})$$</div>
-            <div class="formula">$$H(Q)=-\sum_w Q(w)\ln Q(w),\qquad \operatorname{PPL}=e^{H}$$</div>
-            <div class="formula">$$D_{\text{KL}}(P\,\|\,Q)=\mathcal{L}_{\text{CE}}-H(P)$$</div>
-            <p class="small muted">标签平滑 $\varepsilon&gt;0$ 时，真实分布 $P$ 不再是独热向量：正确词得 $1-\varepsilon$，其余词均分 $\varepsilon$。此时 $H(P)&gt;0$，交叉熵与 KL 散度不再相等。</p>
-          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$H(P,Q)=-\sum_{w}P(w)\ln Q(w)=H(P)+D_{\text{KL}}(P\,\|\,Q)$$</div>
+          <div class="formula">$$\text{独热标签：}\ \mathcal L_{\text{CE}}=-\ln Q(w^*),\qquad \frac{\partial\mathcal L_{\text{CE}}}{\partial\mathbf z}=Q-\mathbf y,\qquad Q_i=\frac{e^{z_i/T}}{\sum_j e^{z_j/T}}$$</div>
+          <div class="explain">$H(P)$ 是题目本身的难度，谁来答都躲不掉；$D_{\text{KL}}(P\|Q)\ge0$ 是模型没学准而多挨的冤枉分，只有 $Q=P$ 时才是 0。它不对称：考官 $P$ 和考生 $Q$ 对调，算出来的数不一样。对“东”这样的独热标签，$H(P)=0$，交叉熵就只剩 $-\ln Q(w^*)$；它和 Softmax 合起来求导，梯度干干净净就是 $Q-\mathbf y$。</div>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>把真实答案设为“雨伞”，再把“雨伞”的 Logit 拉到最低：罚单 $-\ln Q$ 会爆炸到多少？</li>
-            <li>点“全部均匀”：困惑度恰好等于候选词个数 6，这就是“六选一”的含义。</li>
-            <li>把温度 $\tau$ 调到 0.2 再调到 5：分布从“尖峰”变成“平原”，熵和困惑度如何变化？</li>
-            <li>打开标签平滑 $\varepsilon=0.1$：为什么即便模型完美押中，交叉熵也降不到 0？</li>
+            <li>依次点 $Q(\text{东})=0.99$、$0.50$、$0.01$：罚单是 $0.010$、$0.693$、$4.605$；再点 $0.0001$，罚单涨到 $9.210$，平方误差却最多只罚 $0.5$。</li>
+            <li>停在 $Q=0.01$ 看梯度：交叉熵传给 logit 的是 $Q-1=-0.99$，平方误差只剩 $-0.0098$，弱了约 100 倍，错得越离谱反而改得越慢。</li>
+            <li>B 部分取 $p=0.8$，把 $q$ 从 $0.5$ 拖到 $0.8$：$H(P,Q)$ 从 $0.6931$ 降到最低点 $0.5004=H(P)$，KL 从 $0.1927$ 降到 $0$。再点“习题 1.3”：正向 $0.5108$，反向 $0.3681$。</li>
+            <li>C 部分依次点 $T=1$、$0.5$、$2$：概率表是 $(0.80,0.20)$、$(16/17,1/17)\approx(0.941,0.059)$、$(2/3,1/3)$。温度越低越笃定，熵越小。</li>
           </ol>
         </div>
       </div>
@@ -77,7 +94,8 @@
           <button class="btn teal" id="btn-auto">让电脑按频率猜（自动演示）</button>
           <button class="btn ghost" id="btn-reset">重新开始</button>
         </div>
-        <div class="caption">提示：电脑用的是在一段英文语料上统计出的“前两个字符 → 下一个字符”频率表（三元模型）。</div>
+        <div class="caption">第一段就是香农 1951 年论文里用的那段话，出自雷蒙德·钱德勒的一篇侦探小说。论文的真实记录里，贝蒂一次就猜中了 LIGHT 的 L，I 却没能一次猜中。</div>
+        <div class="caption">电脑用的是在一段英文语料上统计出的“前两个字符 → 下一个字符”频率表（三元模型）。</div>
       </div>
       <div class="stack">
         <div class="card">
@@ -100,36 +118,78 @@
             <p class="small muted" style="margin-top:10px">若第 $i$ 次才猜中的频率为 $q_i$，香农证明英文的熵上界约为 $-\sum_i q_i\log_2 q_i$ 比特/字符。完全随机的 27 个符号是 $\log_2 27\approx 4.75$ 比特；香农用真人实验得到约 1 比特，这就是“前文对下一个字施加了极强概率约束”的含义。</p>
           </div>
         </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>自己猜完第一段：单词开头最难猜，单词中间和结尾往往一次就中。你的熵估计比 4.75 比特低多少？</li>
+            <li>猜到 THE ROOM WAS NOT VERY 之后留意 LIGHT：贝蒂当年一次就猜中了 L，却在 I 上卡了一下。你呢？</li>
+            <li>点“只看电脑猜”：只会看前两个字符的三元模型，平均要猜几次？和你自己比一比，前文看得越长，猜得越准。</li>
+          </ol>
+        </div>
       </div>
     </div>
   </section>
 
   <!-- ========================= 实验 3 ========================= -->
-  <section class="experiment" id="chain" data-title="链式法则与数值下溢">
+  <section class="experiment" id="chain" data-title="词语接龙、下溢与困惑度">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">3</span>“我 / 爱 / 数学”</div>
         <div id="chain-sliders"></div>
+        <div class="btn-row"><button class="btn ghost" id="chain-book">恢复书中的 0.5 / 0.4 / 0.8</button></div>
         <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+        <div class="small muted"><b>下溢演示</b>：一句话有 $T$ 个词，每一步都乘同一个概率 $p$</div>
         <div id="len-slider"></div>
         <div id="pstep-slider"></div>
       </div>
       <div class="stack">
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c1)">∏</span>一句话的概率 = 每一步接龙概率的连乘</div>
+          <div class="card-title"><span class="dot" style="background:var(--c1)">∏</span>一句话的概率 = 每一步接龙概率的连乘<span class="sub">按 100 句语料数一数</span></div>
+          <div class="viz h260" id="chain-funnel"></div>
           <div class="formula" id="chain-formula"></div>
           <div class="stats" id="chain-stats"></div>
         </div>
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--coral)">0</span>为什么工程上绝不直接连乘？<span class="sub">float64 实测</span></div>
+          <div class="card-title"><span class="dot" style="background:var(--coral)">0</span>为什么工程上绝不直接连乘？<span class="sub">浏览器里实测</span></div>
           <div class="viz h300" id="underflow"></div>
-          <div class="legend"><span><i style="background:var(--c4)"></i>直接连乘 $\prod_t p$（$\log_{10}$ 刻度，小于约 $10^{-324}$ 后变成 0）</span><span><i style="background:var(--c3)"></i>先取对数再求和 $\sum_t \ln p$（永远稳定）</span></div>
+          <div class="legend"><span><i style="background:var(--c4)"></i>float64 直接连乘（最小正数约 $4.9\times10^{-324}$）</span><span><i style="background:var(--c2)"></i>float16 直接连乘（最小正数约 $6\times10^{-8}$）</span><span><i style="background:var(--c3)"></i>先取对数再求和 $\sum_t\log_{10}p$</span></div>
+          <div class="stats" id="uf-stats" style="margin-top:10px"></div>
+        </div>
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--teal)">k</span>困惑度 = 平均几选一</div>
+            <div id="k-preset" style="margin-bottom:4px"></div>
+            <div id="k-slider"></div>
+            <div class="viz h260" id="k-plot"></div>
+            <div class="stats" id="k-stats" style="margin-top:10px"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--amber)">√</span>为什么用几何平均</div>
+            <div id="g-e"></div>
+            <div id="g-T"></div>
+            <div class="viz h260" id="g-plot"></div>
+            <div class="stats" id="g-stats" style="margin-top:10px"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c4)">✂</span>分词器陷阱（习题 1.4）：同一个单词 unbelievable<span class="sub">表中概率可以直接改</span></div>
+          <div style="overflow-x:auto"><table class="data" id="tok-table"></table></div>
+          <div class="btn-row"><button class="btn ghost" id="tok-book">恢复习题 1.4 的数字</button></div>
+          <div class="caption" id="tok-cap"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$P(w_1,\dots,w_T)=\prod_{t=1}^{T}P(w_t\mid w_{&lt;t})$$</div>
+          <div class="formula">$$\mathcal L=-\frac1T\sum_{t=1}^{T}\ln Q(w_t\mid w_{&lt;t}),\qquad \operatorname{PPL}=e^{\mathcal L}=\Big(\prod_{t=1}^{T}\frac{1}{Q(w_t\mid w_{&lt;t})}\Big)^{1/T}$$</div>
+          <div class="explain">连乘在电脑里会下溢成 0，所以工程上一律先取对数再求和；除以 $T$ 得到每一步的平均罚单 $\mathcal L$，再取指数就是困惑度：模型平均相当于在几个选项里瞎猜。困惑度是 $1/Q$ 的<b>几何</b>平均，一个生僻词不会把整句话的分数拉爆。</div>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>把三步概率都调成 0.25：平均交叉熵 $\ln 4\approx1.386$，困惑度恰好是 4，正对应“四选一”的随机模型。</li>
-            <li>把句长 $T$ 拉到 1000 以上：直接连乘的结果在哪一步彻底变成 0？</li>
+            <li>书中默认 $0.5/0.4/0.8$：100 句里 50 句以“我”开头，20 句是“我爱”，16 句是“我爱数学”。整句概率 $0.16$，$\ln0.16=-1.8326$，平均罚单 $0.6109$，PPL $=(1/0.16)^{1/3}\approx1.842$。</li>
+            <li>$T=400$、$p=0.1$：float64 直接连乘在第 324 步变成 0，float16 连第 8 步都撑不过；对数求和稳稳走到 $-400$。</li>
+            <li>点“4 选 1”“10 选 1”：PPL 恰好是 4 和 10。词表 $V=10$ 万、还没训练的模型在瞎猜，初始损失就是 $\ln100000\approx11.51$。</li>
+            <li>99 个词 $1/Q=1$，1 个生僻词 $1/Q=10^6$：几何平均 $10^{0.06}\approx1.148$，算术平均却是 10,001。分词器表里，B 和 C 的每 token PPL（2.714、5）都比 A 的 100 好看，可 C 给整词的概率 0.008 其实比 A 还低。</li>
           </ol>
         </div>
       </div>

@@ -5,20 +5,86 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>第 11 章 · 在线实验室</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="assets/lab.css">
+<link rel="stylesheet" href="assets/lab.css?v=20261110">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-<script defer src="assets/lab.js"></script>
+<script defer src="assets/lab.js?v=20261110"></script>
 <script defer src="ch11.js"></script>
+<style>
+  .vec-row { display: grid; grid-template-columns: 2.6em repeat(4, 1fr); gap: 6px; align-items: center; margin: 6px 0; }
+  .vec-row.two { grid-template-columns: 4em repeat(2, 1fr); }
+  .vec-row .lab { font-size: 13px; color: var(--slate); text-align: right; }
+  .vec-row input[type=number] { padding: 5px 4px; text-align: center; }
+</style>
 </head>
 <body data-chapter="11">
 <main class="container">
 
   <!-- ========================= 实验 1 ========================= -->
-  <section class="experiment" id="params" data-title="参数量与显存">
+  <section class="experiment" id="blocks" data-title="一列乘一行拼积木">
     <div class="lab-grid">
       <div class="card controls">
-        <div class="card-title"><span class="dot">1</span>LoRA 配置</div>
+        <div class="card-title"><span class="dot">1</span>斯特朗的黑板</div>
+        <div class="small muted">第 1 块积木：竖条 $\mathbf b_1$（$4\times1$）与横条 $\mathbf a_1^\top$（$1\times4$）</div>
+        <div id="v-b1" class="vec-row"></div>
+        <div id="v-a1" class="vec-row"></div>
+        <div id="chk-two" style="margin-top:8px"></div>
+        <div id="block2">
+          <div class="small muted">第 2 块积木：$\mathbf b_2$ 与 $\mathbf a_2^\top$</div>
+          <div id="v-b2" class="vec-row"></div>
+          <div id="v-a2" class="vec-row"></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn ghost" id="btn-book1">书中秩 1 例子</button>
+          <button class="btn ghost" id="btn-book2">书中秩 2 例子</button>
+          <button class="btn ghost" id="btn-rand">随便填</button>
+        </div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <div class="small" style="font-weight:650;color:var(--navy)">放大到真实的权重表</div>
+        <div id="big-d"></div>
+        <div id="big-k"></div>
+        <div id="big-r"></div>
+        <div class="btn-row">
+          <button class="btn ghost" id="btn-4096">$4096\times4096,\ r=8$</button>
+          <button class="btn ghost" id="btn-1000">练习 11.3：$1000\times1000,\ r=2$</button>
+        </div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">×</span>竖条乘横条 = 一整张表<span class="sub">蓝 = 正，红 = 负，颜色越深绝对值越大</span></div>
+          <div class="viz h300" id="blk-draw"></div>
+          <div class="caption" id="blk-cap"></div>
+        </div>
+        <div class="stats" id="blk-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c3)">%</span>大表的参数账与括号账</div>
+          <div class="viz h260" id="big-draw"></div>
+          <div class="caption">左：存 $\Delta\mathbf W$ 要 $dk$ 个数，存 $\mathbf B,\mathbf A$ 只要 $r(d+k)$ 个。右：乘一个向量 $\mathbf x$ 的标量乘法次数，先乘出 $\mathbf B\mathbf A$ 再乘 $\mathbf x$ 要 $drk+dk$ 次，直接乘满秩的 $\Delta\mathbf W$ 要 $dk$ 次，先算 $\mathbf A\mathbf x$ 再乘 $\mathbf B$ 只要 $r(k+d)$ 次（对数坐标）。</div>
+        </div>
+        <div class="stats" id="big-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\Delta\mathbf W_{d\times k}=\mathbf B_{d\times r}\mathbf A_{r\times k}=\sum_{j=1}^{r}\mathbf b_j\mathbf a_j^\top,\qquad \frac{r(d+k)}{dk}=r\Big(\frac1k+\frac1d\Big),\qquad (\mathbf B\mathbf A)\mathbf x=\mathbf B(\mathbf A\mathbf x)$$</div>
+          <p class="small muted" style="margin-bottom:0">一列乘一行得到的表，每一行都是同一根横条的倍数，秩为 1；$r$ 块这样的积木相加，秩最多是 $r$。秩用高斯消元来数：消元后还剩几行不全为 0。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>默认是书中的 $\mathbf b=(1,2,1,2)^\top$、$\mathbf a^\top=(1,0,2,1)$：只存 8 个数，变出的 16 个格子里，每一行都是 $\mathbf a^\top$ 的 1 倍或 2 倍，秩为 1。</li>
+            <li>点“书中秩 2 例子”：加上 $\mathbf b_2=(0,1,0,-1)^\top$、$\mathbf a_2^\top=(0,3,1,0)$，拼出的第 2 行 $(2,3,5,2)$、第 4 行 $(2,-3,3,2)$ 不再是第 1 行的倍数，秩变成 2。</li>
+            <li>把 $\mathbf a_2^\top$ 改成 $\mathbf a_1^\top$ 的倍数，比如 $(2,0,4,2)$：两块积木“撞方向”，秩又掉回 1。</li>
+            <li>大表：$d=k=4096,\ r=8$ 时参数只剩 $1/256\approx0.39\%$，旁路乘法也比乘满秩 $\Delta\mathbf W$ 省 256 倍（书中 11.3 节）；切到练习 11.3 的 $1000\times1000,\ r=2$：先乘出 $\mathbf B\mathbf A$ 要 300 万次乘法，加括号只要 4000 次，快 750 倍。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 2 ========================= -->
+  <section class="experiment" id="params" data-title="LoRA 显存账本">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">2</span>LoRA 配置</div>
         <div class="control"><div class="control-head"><span>基座模型</span></div><div id="p-model"></div></div>
         <div id="p-r"></div>
         <div id="p-alpha"></div>
@@ -40,15 +106,15 @@
         </div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-          <div class="formula">$$\mathbf{h} = \mathbf{W}_0 \mathbf{x} + \frac{\alpha}{r} \mathbf{B}\mathbf{A}\mathbf{x},\qquad \mathbf A\in\mathbb R^{r\times k},\ \mathbf B\in\mathbb R^{d\times r},\qquad \frac{\text{LoRA 参数量}}{\text{原参数量}} = \frac{r(d + k)}{d k}$$</div>
-          <p class="small muted" style="margin-bottom:0">先算 $\mathbf u=\mathbf A\mathbf x\in\mathbb R^r$ 再算 $\mathbf B\mathbf u$，计算量从 $dk$ 降到 $(d+k)r$。训练结束后合并 $\mathbf W_{\text{merged}}=\mathbf W_0+\frac{\alpha}{r}\mathbf B\mathbf A$，推理零额外延迟。$\alpha/r$ 让改变秩时不必重调学习率。</p>
+          <div class="formula">$$M_{\text{per-knob}}=\underbrace{2}_{\text{权重}}+\underbrace{2}_{\text{斜率}}+\underbrace{4+4+4}_{\text{主权重、}m_t\text{、}v_t}=16\ \text{字节},\qquad \frac{\text{LoRA 参数量}}{\text{原参数量}} = \frac{r(d + k)}{d k}$$</div>
+          <p class="small muted" style="margin-bottom:0">冻结的底座只剩 2 字节的权重本身（4 比特量化后 0.5 字节），AdamW 的账本只给 $\mathbf B$、$\mathbf A$ 这些活旋钮记。$\alpha/r$ 让改变秩时基本不必重调学习率。</p>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
             <li>默认是书中的例子 $d=k=4096,\ r=8$：单个矩阵的参数从 1677 万降到 6.55 万，压缩比 $1/256\approx0.39\%$。</li>
-            <li>LLaMA-7B 只在 $\mathbf W_q,\mathbf W_v$ 上挂 $r=8$ 的 LoRA：可训练参数约 420 万，只占全模型的 0.06%。</li>
-            <li>看显存账本：全量微调 7B 要一百多 GB，冻结权重后只剩 BF16 权重本身；再换成 4 比特（QLoRA）又砍掉四分之三。</li>
+            <li>看显存账本：全量微调 7B 要一百多 GB（书中按 70 亿 $\times$ 16 字节估成 112 GB）；冻结底座后只剩 BF16 权重本身；再换成 4 比特（QLoRA）又砍掉四分之三。</li>
+            <li>把挂 LoRA 的矩阵切到“全部 7 个线性层”：可训练参数涨到几千万，账本仍只有几百 MB，这就是 QLoRA 论文主张所有线性层都挂 LoRA 的底气。</li>
             <li>切到 70B：全量微调要一千多 GB，QLoRA 可以塞进一张 48 GB 显卡（激活值另算）。</li>
           </ol>
         </div>
@@ -56,119 +122,49 @@
     </div>
   </section>
 
-  <!-- ========================= 实验 2 ========================= -->
-  <section class="experiment" id="spectrum" data-title="低秩谱与初始化">
+  <!-- ========================= 实验 3 ========================= -->
+  <section class="experiment" id="init" data-title="一零一随机与无痕合并">
     <div class="lab-grid">
       <div class="card controls">
-        <div class="card-title"><span class="dot">2</span>一个“微调更新量” $\Delta\mathbf W$</div>
-        <div id="s-decay"></div>
-        <div id="s-noise"></div>
-        <div id="s-r"></div>
-        <div id="s-log"></div>
-        <div class="btn-row"><button class="btn ghost" id="s-resample">重新采样 $\mathbf U,\mathbf V$</button></div>
-        <div class="caption">$\Delta\mathbf W=\mathbf U\operatorname{diag}(\sigma_i)\mathbf V^\top+\text{噪声}\in\mathbb R^{48\times48}$，$\sigma_i=i^{-\gamma}$；奇异值由单边 Jacobi SVD 实测。</div>
+        <div class="card-title"><span class="dot">3</span>11.4 节的 $2\times2$ 算例</div>
+        <div class="control"><div class="control-head"><span>初始化方案</span></div><div id="i-scheme"></div></div>
+        <div class="small muted">随机的那张小表（书中 $\mathbf A_0=(1,2)$）：</div>
+        <div id="i-rand" class="vec-row two"></div>
+        <div class="small muted">第 1 步传回的斜率矩阵 $\mathbf G_{\Delta\mathbf W}$：</div>
+        <div id="i-g1" class="vec-row two"></div>
+        <div id="i-g2" class="vec-row two"></div>
+        <div id="i-eta"></div>
+        <div class="small muted">合并后检验用的输入 $\mathbf x$：</div>
+        <div id="i-x" class="vec-row two"></div>
+        <div class="btn-row"><button class="btn ghost" id="i-book">恢复书中数字</button></div>
+        <div class="caption">底座 $\mathbf W_0=\left[\begin{smallmatrix}10&0\\0&10\end{smallmatrix}\right]$ 冻结，秩 $r=1$，$\alpha/r=1$。第 2 步假设传回同样的 $\mathbf G_{\Delta\mathbf W}$。</div>
       </div>
       <div class="stack">
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c6)">σ</span>奇异值谱与秩 $r$ 截断</div>
-          <div class="viz h260" id="s-bars"></div>
-          <div class="legend"><span><i style="background:var(--c6)"></i>保留的 $\sigma_1,\dots,\sigma_r$</span><span><i style="background:#cfd6de"></i>被截掉的尾部</span><span><i style="background:var(--navy);height:6px;width:6px;border-radius:50%"></i>无噪声时的真实谱</span></div>
+          <div class="card-title"><span class="dot" style="background:var(--c2)">∂</span>逐步手算</div>
+          <div style="overflow-x:auto"><table class="data" id="i-table"></table></div>
         </div>
-        <div class="stats" id="s-stats"></div>
-        <div class="row2">
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c1)">%</span>能量与误差随秩变化</div>
-            <div class="viz h260" id="s-energy"></div>
-            <div class="legend"><span><i style="background:var(--c6)"></i>能量占比</span><span><i style="background:var(--c4)"></i>相对 Frobenius 误差</span></div>
-          </div>
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c5)">▦</span>$\Delta\mathbf W$、秩 $r$ 近似与残差</div>
-            <div class="viz h260" id="s-heat"></div>
-          </div>
-        </div>
+        <div class="stats" id="i-stats"></div>
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c2)">0</span>为什么 $\mathbf B_0=\mathbf 0$、$\mathbf A_0$ 随机？<span class="sub">用梯度下降拟合一个秩 2 的目标</span></div>
+          <div class="card-title"><span class="dot" style="background:var(--c2)">0</span>放大一点：三种初始化各训练 150 步<span class="sub">用梯度下降拟合一个秩 2 的目标</span></div>
           <div class="viz h260" id="s-init"></div>
           <div class="legend"><span><i style="background:var(--c3)"></i>LoRA：$\mathbf A_0$ 随机，$\mathbf B_0=\mathbf 0$</span><span><i style="background:var(--c4)"></i>全零：$\mathbf A_0=\mathbf B_0=\mathbf 0$</span><span><i style="background:var(--c2)"></i>两者都随机</span></div>
           <div style="overflow-x:auto; margin-top:8px"><table class="data" id="s-init-table"></table></div>
+          <div class="btn-row"><button class="btn ghost" id="s-resample">重新随机</button></div>
           <p class="small muted" style="margin-bottom:0">玩具问题：$\min_{\mathbf A,\mathbf B}\tfrac12\|\mathbf B\mathbf A-\Delta\mathbf W^*\|_F^2$，$d=k=16,\ r=4$，学习率 0.05。$\|\Delta\mathbf W_0\|_F$ 是第 0 步就泼到预训练模型上的“噪声”。</p>
         </div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-          <div class="formula">$$\min_{\operatorname{rank}(\mathbf{M}) \le r} \|\Delta \mathbf{W} - \mathbf{M}\|_F = \sqrt{\sum_{i = r+1}^{\min(d,k)} \sigma_i^2},\qquad \frac{\partial \mathcal{L}}{\partial \mathbf{B}} = \frac{\alpha}{r} \mathbf{G} \mathbf{A}^\top,\quad \frac{\partial \mathcal{L}}{\partial \mathbf{A}} = \frac{\alpha}{r} \mathbf{B}^\top \mathbf{G}$$</div>
-          <p class="small muted" style="margin-bottom:0">Eckart-Young-Mirsky 定理：截断 SVD 就是最优的秩 $r$ 近似。初始化时若 $\mathbf A_0=\mathbf B_0=\mathbf 0$，两个梯度都含有对方这个零因子，永远锁死在零点；LoRA 让 $\mathbf A_0$ 随机、$\mathbf B_0=\mathbf 0$，第 1 步 $\partial\mathcal L/\partial\mathbf B\neq\mathbf 0$ 先把 $\mathbf B$ 推开，第 2 步 $\mathbf A$ 也开始转动，同时保证第 0 步的输出与预训练模型完全一致。</p>
+          <div class="formula">$$\mathbf G_{\mathbf B}=\mathbf G_{\Delta\mathbf W}\mathbf A^\top,\qquad \mathbf G_{\mathbf A}=\mathbf B^\top\mathbf G_{\Delta\mathbf W},\qquad \mathbf W_{\text{merged}}=\mathbf W_0+\tfrac{\alpha}{r}\mathbf B\mathbf A$$</div>
+          <p class="small muted" style="margin-bottom:0">两个梯度都乘着对方：全填零时两个梯度永远是 0，一步都动不了；LoRA 让 $\mathbf B_0=\mathbf 0$ 保证第 0 步输出不变，$\mathbf A_0$ 随机保证第 1 步 $\mathbf G_{\mathbf B}\neq\mathbf 0$。训练完把 $\mathbf B\mathbf A$ 加回 $\mathbf W_0$，单路与两路输出完全相同。</p>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>默认谱衰减较快：$r=8$ 就捕获了绝大部分能量。把 $\gamma$ 调到 0（平坦谱），同样的 $r$ 误差立刻变大，低秩假设失效。</li>
-            <li>加大噪声：尾部奇异值被抬成一片“噪声地板”（Marchenko-Pastur 分布），截断反而起到去噪作用。</li>
-            <li>看热力图：秩 $r$ 近似保留了 $\Delta\mathbf W$ 的大块结构，残差只剩细碎纹理。</li>
-            <li>看初始化对比：全零那条线是水平的，两个梯度都是 0；两者都随机的那条起点更高，因为第 0 步就扰动了模型。</li>
-          </ol>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ========================= 实验 3 ========================= -->
-  <section class="experiment" id="quant" data-title="NF4 量化与 DoRA">
-    <div class="lab-grid">
-      <div class="card controls">
-        <div class="card-title"><span class="dot">3</span>16 个刻度怎么摆？</div>
-        <div id="q-block"></div>
-        <div id="q-n"></div>
-        <div class="btn-row"><button class="btn ghost" id="q-resample">重新采样权重</button></div>
-        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
-        <div class="small" style="font-weight:650;color:var(--navy)">显存账（只算冻结权重）</div>
-        <div class="control"><div class="control-head"><span>模型规模</span></div><div id="q-model"></div></div>
-        <div id="q-dq"></div>
-        <div class="caption">权重按块做 absmax 缩放：每块存一个缩放常数 $c=\max|w|$，块内权重 $w/c\in[-1,1]$ 再映射到最近的刻度。</div>
-      </div>
-      <div class="stack">
-        <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c6)">▮</span>缩放后的权重直方图与两套刻度</div>
-          <div class="viz h300" id="q-hist"></div>
-          <div class="legend"><span><i style="background:var(--c6)"></i>NF4 刻度（正态分位数）</span><span><i style="background:var(--c2)"></i>INT4 刻度（均匀网格）</span><span><i style="background:#cfd6de"></i>$w/c$ 的分布（两端的尖条是每块的最大值本身）</span></div>
-        </div>
-        <div class="stats" id="q-stats"></div>
-        <div class="row2">
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c1)">#</span>每个刻度被用到的比例</div>
-            <div class="viz h260" id="q-use"></div>
-            <div class="caption">等概率使用每个刻度时熵最大，为 $\log_2 16=4$ 比特。</div>
-          </div>
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c4)">GB</span>冻结权重占用</div>
-            <div class="viz h260" id="q-mem"></div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c5)">m</span>DoRA：把一列权重拆成模长与方向<span class="sub">拖动紫色圆点</span></div>
-          <div class="row2">
-            <div class="viz sq" id="q-dora" style="max-height:340px; touch-action:none"></div>
-            <div>
-              <div id="q-dora-m"></div>
-              <div class="stats" id="q-dora-stats"></div>
-              <div class="legend" style="margin-top:8px"><span><i style="background:var(--slate)"></i>预训练列 $\mathbf w_0$</span><span><i style="background:var(--c5)"></i>$\mathbf v=\mathbf w_0+\frac{\alpha}{r}\mathbf B\mathbf A$ 的这一列（LoRA 的结果）</span><span><i style="background:var(--c3)"></i>DoRA 输出 $m\,\mathbf v/\|\mathbf v\|$</span></div>
-              <p class="small muted">普通 LoRA 的一次更新会同时改变长度和角度；DoRA 只让 LoRA 负责方向，长度交给单独的标量 $m$（初始化为 $\|\mathbf w_0\|$）。拖动圆点改方向，滑块改长度，两者互不牵连。</p>
-            </div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-          <div class="formula">$$q_i^{\text{NF4}} = \frac{1}{2}\left( \Phi^{-1}\!\left(\frac{i}{16}\right) + \Phi^{-1}\!\left(\frac{i+1}{16}\right) \right),\qquad \Phi^{-1}(p) = \sqrt{2}\,\operatorname{erf}^{-1}(2p - 1)$$</div>
-          <div class="formula">$$\mathbf{W}_{\text{DoRA}} = \mathbf{m} \odot \frac{\mathbf{W}_0 + \frac{\alpha}{r}\mathbf{B}\mathbf{A}}{\big\|\mathbf{W}_0 + \frac{\alpha}{r}\mathbf{B}\mathbf{A}\big\|_c},\qquad \mathbf m_0=\|\mathbf W_0\|_c$$</div>
-          <p class="small muted" style="margin-bottom:0">思路是让 16 个刻度在正态分布下等概率。书中公式取相邻分位点的中点，但两端 $\Phi^{-1}(0)=-\infty$；QLoRA 的实际实现用偏移 $0.9677$ 截断两端，正半轴取 8 个、负半轴取 7 个分位点，再加上精确的 0，最后除以最大值归一到 $[-1,1]$，本页的 NF4 刻度就是这样算出来的。双重量化把每块的 FP32 缩放常数再量化成 8 比特（每 256 块共用一个 FP32 常数），额外开销从每参数 0.5 比特降到约 0.127 比特。</p>
-        </div>
-        <div class="try">
-          <h3>🧪 试一试</h3>
-          <ol>
-            <li>默认块大小 64：NF4 的均方误差明显低于 INT4，刻度使用率也更均匀（熵更接近 4 比特）。</li>
-            <li>把块大小调到 4096：absmax 被极端值拉大，$w/c$ 挤向 0 附近，INT4 两端的刻度几乎没人用，误差差距进一步拉大。</li>
-            <li>把块大小调到 16：每块只有 16 个数，$w/c$ 不再像正态分布，INT4 甚至略胜 NF4；代价是缩放常数的开销翻 4 倍，达到每参数 2 比特。</li>
-            <li>块大小为 64 时勾选双重量化并切到 70B：缩放常数从约 4.3 GB 降到约 1.1 GB。</li>
-            <li>在 DoRA 图里把紫点沿圆弧拖动：只有方向在变；再拖动 $m$ 滑块：只有长度在变。普通 LoRA 做不到这样分开调。</li>
+            <li>默认就是书中算例：$\mathbf G_{\mathbf B}=(-5,-10)^\top$，$\mathbf B_1=(1,2)^\top$，$\mathbf W_{\text{merged}}=\left[\begin{smallmatrix}11&2\\2&14\end{smallmatrix}\right]$，两路输出都是 $(13,16)$。</li>
+            <li>切到“全零”：每一步的两个梯度都是 0，表格里一行行全是 0。</li>
+            <li>切到“反过来”（$\mathbf A_0=\mathbf 0$、$\mathbf B_0$ 随机）：第 1 步先动 $\mathbf A$，第 2 步 $\mathbf B$ 才动，也能跑起来，对应书中问 1。不过它第 0 步也满足 $\mathbf B_0\mathbf A_0=\mathbf 0$。</li>
+            <li>看下方 150 步曲线：全零那条是水平的；两者都随机的那条起点更高，因为第 0 步就扰动了模型。</li>
           </ol>
         </div>
       </div>

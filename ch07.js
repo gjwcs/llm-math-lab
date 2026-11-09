@@ -1,7 +1,7 @@
 /* 第 7 章：深层信号传播动力学：交互实验 */
 (function () {
   const { COLORS: C, M } = LAB;
-  LAB.page({ bookRef: '对应书中 §7.2 残差流与 Pre-LN · §7.3 RMSNorm · §7.4 SwiGLU · §7.5 雅可比 · §7.6 秩坍缩 · §7.7 1/√(2L) 缩放' });
+  LAB.page({ bookRef: '对应书中 §7.1 残差直通车与 Pre-Norm · §7.2 LayerNorm 与 RMSNorm 手算 · §7.3 SwiGLU 与 1/√(2L) 缩放 · §7.4 手算一层 · 练习 7.1–7.3' });
 
   const $ = (s) => document.querySelector(s);
   const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
@@ -150,6 +150,30 @@
   }
   run1();
 
+  // 手算连乘题：a^L 与残差保底项 1；方差账本 1+2L 与 2（书中 7.1 节、练习 7.3）
+  const stM = { a: 0.8, L: 100 };
+  LAB.slider('#m-a', { label: '每层导数 $a$', min: 0.5, max: 1.5, step: 0.01, value: stM.a, fmt: (v) => v.toFixed(2), onInput: (v) => { stM.a = v; updM(); } });
+  LAB.slider('#m-L', { label: '层数 $L$', min: 1, max: 200, step: 1, value: stM.L, onInput: (v) => { stM.L = v; updM(); } });
+  const mPlot = LAB.canvas('#m-plot', (ctx, w, h) => {
+    const { a, L } = stM, xs = M.range(L + 1), ys = xs.map((l) => Math.pow(a, l));
+    const [e0, e1] = logSpan([ys], 0.5, 2);
+    const P = new LAB.Plot(ctx, w, h, { xmin: 0, xmax: L, ymin: Math.pow(10, e0), ymax: Math.pow(10, e1), logy: true, ytickValues: logTicks(e0, e1), xlabel: '层数 l', pad: { l: 54, r: 12, t: 12, b: 36 } }).axes();
+    P.clip(); P.line(xs, xs.map(() => 1), C.c3, 2.4); P.line(xs, ys, C.c4, 2.4); P.unclip();
+    P.points([L], [ys[L]], C.c4, 4.5, '#fff');
+  });
+  const ms1 = LAB.stat('#m-stats', '无残差：$a^L$', 'coral');
+  const ms2 = LAB.stat('#m-stats', '残差保底项', 'leaf');
+  const ms3 = LAB.stat('#m-stats', '主干道方差（不缩放）$1+2L$', 'amber');
+  const ms4 = LAB.stat('#m-stats', '支线 $\\times1/\\sqrt{2L}$ 后', 'teal');
+  const texSci = (v) => { if (v === 0) return '0'; const e = Math.floor(Math.log10(Math.abs(v))); if (e >= -2 && e < 4) return v.toPrecision(4); return (v / Math.pow(10, e)).toFixed(2) + '\\times10^{' + e + '}'; };
+  function updM() {
+    const { a, L } = stM, v = Math.pow(a, L);
+    ms1.set(fe(v)); ms2.set('1'); ms3.set(String(1 + 2 * L)); ms4.set('2');
+    $('#m-formula').innerHTML = LAB.tex(`${a.toFixed(2)}^{${L}}\\approx ${texSci(v)}`, true);
+    mPlot.redraw();
+  }
+  updM();
+
   /* ================= 实验 2：RMSNorm 超球面 ================= */
   const st2 = { mode: 0, dim: 3, mu: 0.6, la: 0, t: 1, yaw: -0.65, pitch: 0.38, seed: 3 };
   const EPS = 1e-5;
@@ -254,6 +278,46 @@
   }
   upd2();
 
+  // 手算对比：x=(1,2,3,4) 的 LayerNorm 四步与 RMSNorm 两步（书中 7.2 节）
+  const stH = { x: [1, 2, 3, 4], big: false };
+  const hS = [1, 2, 3, 4].map((k) => LAB.slider('#h-x' + k, { label: `$x_${k}$`, min: -10, max: 10, step: 0.5, value: stH.x[k - 1], fmt: (v) => v.toFixed(1), onInput: (v) => { stH.x[k - 1] = v; updH(); } }));
+  $('#h-reset').onclick = () => { stH.x = [1, 2, 3, 4]; stH.big = false; $('#h-x10').textContent = '整体放大 10 倍'; hS.forEach((sl, i) => sl.set(stH.x[i])); updH(); };
+  $('#h-x10').onclick = () => { stH.big = !stH.big; $('#h-x10').textContent = stH.big ? '恢复原尺度' : '整体放大 10 倍'; updH(); };
+  let HR = null;
+  function handCalc() {
+    const sc = stH.big ? 10 : 1, x = stH.x.map((v) => v * sc), eps = 1e-5;
+    const mu = M.mean(x), xc = x.map((v) => v - mu), va = M.mean(xc.map((v) => v * v)), sd = Math.sqrt(va);
+    const ln = xc.map((v) => v / Math.sqrt(va + eps));
+    const rms = Math.sqrt(M.mean(x.map((v) => v * v)));
+    const rn = x.map((v) => (rms > 0 ? v / rms : 0));
+    return { x, mu, xc, va, sd, ln, rms, rn, sq: M.sum(rn.map((v) => v * v)) };
+  }
+  const hBars = LAB.canvas('#h-bars', (ctx, w, h) => {
+    if (!HR) return;
+    const all = HR.ln.concat(HR.rn), m = Math.max(1.6, ...all.map(Math.abs)) * 1.15;
+    const P = new LAB.Plot(ctx, w, h, { xmin: 0.4, xmax: 4.6, ymin: -m, ymax: m, xtickValues: [1, 2, 3, 4], xfmt: (v) => 'x' + v, pad: { l: 40, r: 10, t: 12, b: 30 } }).axes();
+    P.hline(0, '#9aa5b1', null, 1);
+    const bw = Math.min(16, (P.tx(2) - P.tx(1)) * 0.3), dx = P.ix(P.tx(1) + bw * 0.6) - 1;
+    P.bars([1, 2, 3, 4].map((i) => i - dx), HR.ln, C.c4, bw);
+    P.bars([1, 2, 3, 4].map((i) => i + dx), HR.rn, C.c1, bw);
+    P.text(0.5, m * 0.9, 'LayerNorm', C.c4, 'left', 'middle', '600 12px PingFang SC, sans-serif');
+    P.text(0.5, m * 0.75, 'RMSNorm', C.c1, 'left', 'middle', '600 12px PingFang SC, sans-serif');
+  });
+  function updH() {
+    HR = handCalc();
+    const f = (a, dg) => '(' + a.map((v) => v.toFixed(dg == null ? 3 : dg)).join(', ') + ')';
+    const r = HR;
+    $('#h-table').innerHTML = `<tr><th>步骤</th><th>LayerNorm（四步走）</th><th>RMSNorm（两步走）</th></tr>
+      <tr><td>输入</td><td colspan="2">$\\mathbf x=${f(r.x, 1)}$</td></tr>
+      <tr><td>第 1 步</td><td>$\\mu=${r.mu.toFixed(3)}$</td><td>$\\operatorname{RMS}=\\sqrt{${(r.rms * r.rms).toFixed(3)}}\\approx${r.rms.toFixed(4)}$</td></tr>
+      <tr><td>第 2 步</td><td>$\\mathbf x-\\mu=${f(r.xc, 2)}$</td><td>$\\mathbf x/\\operatorname{RMS}=${f(r.rn)}$</td></tr>
+      <tr><td>第 3 步</td><td>$\\sigma^2=${r.va.toFixed(3)},\\ \\sigma\\approx${r.sd.toFixed(3)}$</td><td>平方和 $=${r.sq.toFixed(3)}$（$d=4$）</td></tr>
+      <tr><td>第 4 步</td><td>$(\\mathbf x-\\mu)/\\sigma=${f(r.ln, 2)}$</td><td>（两步已完成）</td></tr>`;
+    LAB.renderMath($('#h-table'));
+    hBars.redraw();
+  }
+  updH();
+
   // 雅可比切向投影（d = 2）
   const J = { x: [2.3, 0.9], g: [0.5, 1.2], drag: null, P: null };
   const jac = LAB.canvas('#n-jac', (ctx, w, h) => {
@@ -304,8 +368,8 @@
     jac.redraw();
   };
 
-  /* ================= 实验 3：门控激活与秩坍缩 ================= */
-  const st3 = { beta: 1, deriv: false, kind: 0, probe: [-1.2, 2.5], layer: 4, tau: 1, seed: 5 };
+  /* ================= 实验 3：SwiGLU 水龙头车间 ================= */
+  const st3 = { beta: 1, deriv: false, kind: 0, probe: [-1, 2] };
   const sig = (z) => 1 / (1 + Math.exp(-z));
   const swish = (z, b) => z * sig(b * z);
   const dswish = (z, b) => { const s = sig(b * z); return s + b * z * s * (1 - s); };
@@ -337,9 +401,10 @@
   });
   const g1 = LAB.stat('#g-stats', '$\\operatorname{Swish}_\\beta$ 最小值', 'teal');
   const g2 = LAB.stat('#g-stats', '最小值位置 $z^*$', 'teal');
-  const g3 = LAB.stat('#g-stats', '$z=-2$ 处导数：Swish', 'leaf');
-  const g4 = LAB.stat('#g-stats', '$z=-2$ 处导数：ReLU', 'coral');
-  g4.set('0');
+  const g3 = LAB.stat('#g-stats', '$z=-1$ 处的 $\\operatorname{Swish}$ 值', 'leaf');
+  const g4 = LAB.stat('#g-stats', '$z=-1$ 处的 Swish 导数', 'leaf');
+  const g5 = LAB.stat('#g-stats', '$z=-1$ 处 ReLU 的值 / 导数', 'coral');
+  g5.set('0 / 0');
   // 门控曲面
   const NG = 121, AMAX = 4;
   const surf = LAB.canvas('#g-surf', (ctx, w, h) => {
@@ -362,77 +427,39 @@
   function probeAt(x, y) { const P = surf._P; if (!P) return; st3.probe = [M.clamp(P.ix(x), -AMAX, AMAX), M.clamp(P.iy(y), -AMAX, AMAX)]; showProbe(); surf.redraw(); }
   function showProbe() {
     const [a, b] = st3.probe, name = ['\\operatorname{Swish}_{' + +st3.beta.toFixed(2) + '}', '\\operatorname{GELU}', '\\operatorname{ReLU}'][st3.kind];
-    $('#g-probe').innerHTML = LAB.tex(`\\begin{gathered}a=${a.toFixed(2)},\\quad b=${b.toFixed(2)}\\\\ ${name}(a)\\cdot b=${phi(a).toFixed(3)}\\times${b.toFixed(2)}=${(phi(a) * b).toFixed(3)}\\end{gathered}`, true);
+    const dphi = st3.kind === 0 ? dswish(a, st3.beta) : st3.kind === 1 ? dgelu(a) : (a > 0 ? 1 : 0);
+    $('#g-probe').innerHTML = LAB.tex(`\\begin{gathered}a=${a.toFixed(2)},\\quad b=${b.toFixed(2)}\\\\ y=${name}(a)\\cdot b=${phi(a).toFixed(3)}\\times${b.toFixed(2)}=${(phi(a) * b).toFixed(3)}\\\\ \\tfrac{\\partial y}{\\partial a}=${dphi.toFixed(3)}\\times${b.toFixed(2)}=${(dphi * b).toFixed(3)},\\quad \\tfrac{\\partial y}{\\partial b}=${phi(a).toFixed(3)}\\end{gathered}`, true);
   }
   function upd3() {
     const b = st3.beta;
     if (b > 0.05) { g1.set((-0.278465 / b).toFixed(3)); g2.set((-1.27846 / b).toFixed(3)); } else { g1.set('−∞'); g2.set('无'); }
-    g3.set(dswish(-2, b).toFixed(3));
+    g3.set(swish(-1, b).toFixed(3)); g4.set(dswish(-1, b).toFixed(3));
     act.redraw(); surf.redraw(); showProbe();
   }
   upd3();
 
-  // 秩坍缩
-  const T = 8, D = 16, LMAX = 16;
-  let RC = null;
-  function gauss(R, r, c, s) { return M.range(r).map(() => M.range(c).map(() => R.normal() * s)); }
-  const mm = (A, B) => A.map((row) => B[0].map((_, j) => { let t = 0; for (let k = 0; k < row.length; k++) t += row[k] * B[k][j]; return t; }));
-  const tr = (A) => A[0].map((_, j) => A.map((r) => r[j]));
-  function orth(R, n) { const G = gauss(R, n, n, 1), Q = []; for (let i = 0; i < n; i++) { let v = G[i].slice(); for (const q of Q) { const p = M.dot(v, q); v = v.map((x, k) => x - p * q[k]); } const nn = M.norm(v); Q.push(v.map((x) => x / nn)); } return Q; }
-  const softmaxRows = (S) => S.map((r) => M.softmax(r));
-  function resid(X) { const mean = X[0].map((_, j) => M.mean(X.map((r) => r[j]))); let n = 0, f = 0; X.forEach((r) => r.forEach((v, j) => { n += (v - mean[j]) ** 2; f += v * v; })); return Math.sqrt(n / f); }
-  const rmsRows = (X) => X.map((r) => { const s = Math.sqrt(r.reduce((a, v) => a + v * v, 0) / r.length); return r.map((v) => v / s); });
-  function buildRC() {
-    const R = LAB.rng(st3.seed), X0 = gauss(R, T, D, 1);
-    const layers = M.range(LMAX).map(() => ({ Q: gauss(R, D, D, 1 / Math.sqrt(D)), K: gauss(R, D, D, 1 / Math.sqrt(D)), V: orth(R, D) }));
-    // 初始点云的前两个主成分（幂迭代）
-    const mean = X0[0].map((_, j) => M.mean(X0.map((r) => r[j]))), Xc = X0.map((r) => r.map((v, j) => v - mean[j]));
-    const Cov = mm(tr(Xc), Xc), pcs = [];
-    for (let k = 0; k < 2; k++) { let v = M.range(D).map((i) => Math.sin(i + 1 + k)); for (let it = 0; it < 200; it++) { let w = Cov.map((r) => M.dot(r, v)); pcs.forEach((p) => { const c = M.dot(w, p); w = w.map((x, i) => x - c * p[i]); }); const nn = M.norm(w); v = w.map((x) => x / nn); } pcs.push(v); }
-    const run = (kind) => {
-      let X = X0; const Xs = [X], rs = [resid(X)];
-      const t2 = st3.tau * st3.tau;
-      for (const Ly of layers) {
-        const Z = kind === 'res' ? rmsRows(X) : X;
-        const S = mm(mm(Z, Ly.Q), tr(mm(Z, Ly.K))).map((r) => r.map((x) => (x * t2) / Math.sqrt(D)));
-        const Y = mm(mm(softmaxRows(S), Z), Ly.V);
-        X = kind === 'pure' ? Y : X.map((r, i) => r.map((x, j) => x + Y[i][j]));
-        Xs.push(X); rs.push(Math.max(resid(X), 1e-17));
-      }
-      return { Xs, rs };
-    };
-    RC = { pcs, pure: run('pure'), res: run('res') };
+  // 手算一层：x → RMSNorm → SwiGLU → 加回主干道（书中 7.4 节）
+  const stT = { x: [3, 4] };
+  const Wg = [[1.1785, 0], [0, 0]], Wu = [[2.357, 0], [0, 0.8839]];
+  const vm = (v, W) => [v[0] * W[0][0] + v[1] * W[1][0], v[0] * W[0][1] + v[1] * W[1][1]];
+  const tX = [1, 2].map((k) => LAB.slider('#t-x' + k, { label: `$x_${k}$`, min: -6, max: 6, step: 0.1, value: stT.x[k - 1], fmt: (v) => v.toFixed(1), onInput: (v) => { stT.x[k - 1] = v; updT(); } }));
+  $('#t-reset').onclick = () => { stT.x = [3, 4]; tX.forEach((sl, i) => sl.set(stT.x[i])); updT(); };
+  const tsa = LAB.stat('#t-stats', '$\\operatorname{RMS}(\\mathbf x)$', 'teal');
+  const tsb = LAB.stat('#t-stats', '支线输出 $\\operatorname{FFN}$', 'amber');
+  const tsc = LAB.stat('#t-stats', '下一层 $\\mathbf x_{\\text{next}}$', 'leaf');
+  function updT() {
+    const x = stT.x, r = Math.sqrt((x[0] * x[0] + x[1] * x[1]) / 2), xh = x.map((v) => (r > 0 ? v / r : 0));
+    const z = vm(xh, Wg), u = vm(xh, Wu), g = z.map((v) => swish(v, 1)), y = g.map((v, i) => v * u[i]), nx = x.map((v, i) => v + y[i]);
+    const f = (a, dg) => '(' + a.map((v) => v.toFixed(dg == null ? 4 : dg)).join(',\\ ') + ')';
+    const p = (a, dg) => '(' + a.map((v) => v.toFixed(dg)).join(', ') + ')';
+    $('#t-table').innerHTML = `<tr><th>步骤</th><th>算式</th><th>结果</th></tr>
+      <tr><td>第 1 步：RMSNorm</td><td>$\\operatorname{RMS}=\\sqrt{(x_1^2+x_2^2)/2}$，$\\hat{\\mathbf x}=\\mathbf x/\\operatorname{RMS}$</td><td>$${r.toFixed(4)}$，$${f(xh)}$</td></tr>
+      <tr><td>第 2 步：门控</td><td>$\\mathbf z=\\hat{\\mathbf x}\\mathbf W_{\\text{gate}}$，$\\mathbf g=\\operatorname{Swish}(\\mathbf z)$</td><td>$${f(z)}$，$${f(g)}$</td></tr>
+      <tr><td>第 2 步：内容</td><td>$\\mathbf u=\\hat{\\mathbf x}\\mathbf W_{\\text{up}}$</td><td>$${f(u)}$</td></tr>
+      <tr><td>第 2 步：相乘</td><td>$(\\mathbf g\\odot\\mathbf u)\\mathbf W_{\\text{down}}$</td><td>$${f(y)}$</td></tr>
+      <tr><td>第 3 步：加回</td><td>$\\mathbf x+\\operatorname{FFN}$</td><td>$${f(nx)}$</td></tr>`;
+    LAB.renderMath($('#t-table'));
+    tsa.set(r.toFixed(4)); tsb.set(p(y, 4)); tsc.set(p(nx, 4));
   }
-  const TOK = [C.c1, C.c2, C.c3, C.c4, C.c5, C.c6, C.navy, C.slate];
-  const scat = LAB.canvas('#r-scatter', (ctx, w, h) => {
-    if (!RC) return;
-    const half = w / 2, l = st3.layer;
-    [['纯注意力', RC.pure], ['加残差', RC.res]].forEach(([name, run], q) => {
-      const ox = q * half, cx = ox + half / 2, cy = h / 2 + 8, sc = Math.min(half, h - 30) / 2 / 1.25;
-      ctx.save(); ctx.strokeStyle = C.line; ctx.strokeRect(ox + 4, 22, half - 8, h - 26); ctx.restore();
-      ctx.fillStyle = q === 0 ? C.c4 : C.c1; ctx.font = '600 12.5px PingFang SC, sans-serif'; ctx.textAlign = 'left'; ctx.fillText(`${name} · 第 ${l} 层`, ox + 6, 15);
-      const pos = (X, i) => { const s = Math.sqrt(X.reduce((a, r) => a + r.reduce((b, v) => b + v * v, 0), 0) / X.length); return [M.dot(X[i], RC.pcs[0]) / s, M.dot(X[i], RC.pcs[1]) / s]; };
-      for (let i = 0; i < T; i++) {
-        ctx.strokeStyle = TOK[i]; ctx.globalAlpha = 0.35; ctx.lineWidth = 1.2; ctx.beginPath();
-        for (let k = 0; k <= l; k++) { const p = pos(run.Xs[k], i), X = cx + sc * M.clamp(p[0], -1.3, 1.3), Y = cy - sc * M.clamp(p[1], -1.3, 1.3); if (k === 0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y); }
-        ctx.stroke(); ctx.globalAlpha = 1;
-      }
-      for (let i = 0; i < T; i++) { const p = pos(run.Xs[l], i); ctx.fillStyle = TOK[i]; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(cx + sc * M.clamp(p[0], -1.3, 1.3), cy - sc * M.clamp(p[1], -1.3, 1.3), 4.5, 0, 7); ctx.fill(); ctx.stroke(); }
-    });
-  });
-  const curve = LAB.canvas('#r-curve', (ctx, w, h) => {
-    if (!RC) return;
-    const xs = M.range(LMAX + 1);
-    const P = new LAB.Plot(ctx, w, h, { xmin: 0, xmax: LMAX, ymin: 1e-17, ymax: 1, logy: true, ytickValues: [1e-16, 1e-12, 1e-8, 1e-4, 1], xlabel: '层 l', ylabel: '到秩 1 的相对距离', pad: { l: 50, r: 10, t: 10, b: 36 } }).axes();
-    P.vline(st3.layer, C.slate, [3, 3]);
-    P.line(xs, RC.pure.rs, C.c4, 2.4); P.line(xs, RC.res.rs, C.c1, 2.4);
-    P.points([st3.layer], [RC.pure.rs[st3.layer]], C.c4, 4.5, '#fff'); P.points([st3.layer], [RC.res.rs[st3.layer]], C.c1, 4.5, '#fff');
-  });
-  const rs1 = LAB.stat('#r-stats', '纯注意力：第 $l$ 层相对残差', 'coral');
-  const rs2 = LAB.stat('#r-stats', '加残差：第 $l$ 层相对残差');
-  function upd3r() { const l = st3.layer; rs1.set(fe(RC.pure.rs[l])); rs2.set(fe(RC.res.rs[l])); scat.redraw(); curve.redraw(); }
-  LAB.slider('#r-layer', { label: '查看第 $l$ 层', min: 0, max: LMAX, step: 1, value: st3.layer, onInput: (v) => { st3.layer = v; upd3r(); } });
-  LAB.slider('#r-tau', { label: '注意力锐度 $\\tau$', min: 0.5, max: 3, step: 0.05, value: 1, fmt: (v) => v.toFixed(2), hint: '打分 $\\tau^2\\,\\mathbf q^\\top\\mathbf k/\\sqrt d$，越大越尖锐', onInput: (v) => { st3.tau = v; buildRC(); upd3r(); } });
-  $('#r-resample').onclick = () => { st3.seed++; buildRC(); upd3r(); };
-  buildRC(); upd3r();
+  updT();
 })();

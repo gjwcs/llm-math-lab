@@ -5,58 +5,63 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>第 3 章 · 在线实验室</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="assets/lab.css">
+<link rel="stylesheet" href="assets/lab.css?v=20261110">
+<style>@media (max-width: 640px) { .card-title { flex-wrap: wrap; } .card-title .sub { margin-left: 32px; flex-basis: 100%; } .stats { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); } }</style>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-<script defer src="assets/lab.js"></script>
+<script defer src="assets/lab.js?v=20261110"></script>
 <script defer src="ch03.js"></script>
 </head>
 <body data-chapter="3">
 <main class="container">
 
   <!-- ========================= 实验 1 ========================= -->
-  <section class="experiment" id="relu-fit" data-title="ReLU 拼图">
+  <section class="experiment" id="tent" data-title="三个折页搭帐篷">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">1</span>参数控制台</div>
-        <p class="small">单隐藏层网络 $f(x)=c_0+\sum_{m=1}^{N} c_m\,\operatorname{ReLU}(x-t_m)$：拐点 $t_m$ 固定，用最小二乘求出输出层权重 $c_m$。</p>
-        <div class="small muted">目标函数（也可以直接在图上<b>按住拖动画一条</b>）：</div>
-        <div id="r-target" style="margin:6px 0 4px"></div>
-        <div id="r-n"></div>
-        <div class="small muted">拐点 $t_m$ 的位置：</div>
-        <div id="r-knots" style="margin:6px 0 4px"></div>
-        <div id="r-pieces"></div>
-        <div class="btn-row">
-          <button class="btn ghost" id="r-reroll">重新随机拐点</button>
-          <button class="btn ghost" id="r-clear">清空手绘</button>
-        </div>
+        <p class="small">三个平移过的 ReLU 折页相加：</p>
+        <div class="formula" style="font-size:13px">$$T(x)=c_1\,\mathrm{ReLU}(x-t_1)+c_2\,\mathrm{ReLU}(x-t_2)+c_3\,\mathrm{ReLU}(x-t_3)$$</div>
+        <div class="small muted">三个系数（书中是 $+1,\,-2,\,+1$）：</div>
+        <div id="t-c1"></div><div id="t-c2"></div><div id="t-c3"></div>
+        <div class="small muted">三个拐点（书中是 $0,\,1,\,2$）：</div>
+        <div id="t-t1"></div><div id="t-t2"></div><div id="t-t3"></div>
+        <div id="t-show"></div>
+        <div class="btn-row"><button class="btn ghost" id="t-reset">恢复书中的 $(+1,-2,+1)$</button></div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <div class="small muted">第二部分：在 $[0,2]$ 上每隔 $\Delta x$ 搭一顶帐篷，去拼抛物线 $x^2$。</div>
+        <div id="p-dx" style="margin:8px 0 4px"></div>
       </div>
       <div class="stack">
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c3)">∿</span>折线拼出的曲线<span class="sub">灰色 = 目标 · 蓝色 = 网络输出 · 细线 = 每个 ReLU 分量</span></div>
-          <div class="viz h340" id="r-main"></div>
+          <div class="card-title"><span class="dot" style="background:var(--c3)">⋀</span>三个折页与它们的和<span class="sub">细线 = 三个分量 · 粗线 = $T(x)$</span></div>
+          <div class="viz h340" id="t-main"></div>
+          <div class="legend"><span><i style="background:var(--c1)"></i>1 号折页</span><span><i style="background:var(--c4)"></i>2 号折页</span><span><i style="background:var(--c2)"></i>3 号折页</span><span><i style="background:var(--navy)"></i>合成的 $T(x)$</span></div>
         </div>
-        <div class="stats" id="r-stats"></div>
-        <div class="row2">
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--coral)">ε</span>误差随神经元个数 $N$ 下降</div>
-            <div class="viz h260" id="r-err"></div>
-            <div class="legend"><span><i style="background:var(--c4)"></i>$L_\infty$ 最大误差</span><span><i style="background:var(--c1)"></i>$L_2$ 均方根误差</span><span><i style="background:var(--c2)"></i>参考斜率 $N^{-2}$</span></div>
-          </div>
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-            <div class="formula">$$\begin{gathered}f(\mathbf{x}) = \sum_{m=1}^{M} c_m \, \sigma\!\left(\mathbf{w}_m^\top \mathbf{x} + b_m\right)\\ \operatorname{ReLU}(z) = \max(0, z)\end{gathered}$$</div>
-            <div class="explain">单个 ReLU 是拐点 $x_m=-b_m/w_m$ 处翘起的折尺；两个相减得到台阶，四个组合得到梯形凸起。把 $N$ 个折尺加起来，就是能逼近任意连续函数的分段线性函数。</div>
-            <p class="small muted">这里取 $w_m=1,\ b_m=-t_m$，只训练输出层 $c_m$，问题变成线性最小二乘，可以一步解出。</p>
-          </div>
+        <div class="stats" id="t-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c2)">✍</span>3.2 节的手算账本<span class="sub">随左侧参数实时重算</span></div>
+          <div style="overflow-x:auto"><table class="data" id="t-table"></table></div>
+          <div class="caption">书中默认值下 $T(x)$ 依次是 $0,\,0,\,0.5,\,1,\,0.5,\,0,\,0$：只在 $[0,2]$ 上隆起一顶高为 $1$ 的小帐篷。把 $c_3$ 拖成 $0$，右边就会顺着斜率 $-1$ 一路掉下去。</div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--coral)">∿</span>帐篷拼抛物线：$\hat f(x)=\sum_k f(x_k)\,T_k(x)$ 逼近 $x^2$<span class="sub" id="p-sub"></span></div>
+          <div class="viz h300" id="p-main"></div>
+          <div class="legend"><span><i style="background:#B8C1CC"></i>真实曲线 $x^2$</span><span><i style="background:var(--c1)"></i>帐篷拼出的折线</span><span><i style="background:var(--c4)"></i>误差 $\hat f(x)-x^2$（放大 4 倍画在底部）</span></div>
+        </div>
+        <div class="stats" id="p-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$T_k(x) = \frac{1}{\Delta x}\Big[ \mathrm{ReLU}\big(x - (x_k - \Delta x)\big) - 2\,\mathrm{ReLU}(x - x_k) + \mathrm{ReLU}\big(x - (x_k + \Delta x)\big) \Big],\qquad \hat{f}_N(x) = \sum_{k} f(x_k)\, T_k(x)$$</div>
+          <div class="explain">三个系数 $(+1,-2,+1)$ 加起来等于 $0$，所以走过最后一个拐点后总斜率回到 $0$，帐篷右脚稳稳落地。把一排帐篷按目标曲线的高度缩放后相加，就是穿过所有采样点的折线。对 $x^2$ 来说，相邻两点中间的最大误差恰好是 $\Delta x^2/4$：$\Delta x=1$ 时 $0.25$，$\Delta x=0.5$ 时 $0.0625$。</div>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>选正弦 $\sin 2\pi x$、$N=8$（书中 CPU 实战的设置）：8 段折线已经相当像了。再看误差图：对光滑函数，误差按 $N^{-2}$ 下降。</li>
-            <li>选绝对值 $|2x-1|$：$N$ 为偶数时拐点恰好落在 $x=\tfrac12$，误差直接降到 0；$N$ 为奇数时则不行。</li>
-            <li>选阶跃函数：$L_2$ 误差在降，$L_\infty$ 误差却始终卡在 $0.5$ 左右。万能逼近定理只对<b>连续</b>函数成立。</li>
-            <li>在图上随手画一条曲线，再把拐点换成“随机”：同样的 $N$，随机拐点的误差更大也更不稳定。</li>
+            <li>保持书中的系数，读表格：$x=1.5$ 时 1 号折页给 $1.5$，2 号折页给 $-2\times0.5=-1$，合起来正好 $0.5$。</li>
+            <li>把 $c_3$ 拖到 $0$：右边不再落地，这就是“删掉第 3 项”的思想实验。再把 $c_3$ 拖到 $+2$，帐篷右边会重新翘起来。</li>
+            <li>第二部分选 $\Delta x=1$：只用 2 个 ReLU，就是 3.4 节的 $\mathrm{ReLU}(x)+2\,\mathrm{ReLU}(x-1)$，在 $x=0.5$ 与 $1.5$ 处各差 $0.25$。</li>
+            <li>每把 $\Delta x$ 减半，ReLU 个数翻倍，最大误差缩小到原来的 $\tfrac14$。</li>
           </ol>
         </div>
       </div>
@@ -64,51 +69,50 @@
   </section>
 
   <!-- ========================= 实验 2 ========================= -->
-  <section class="experiment" id="folding" data-title="深度折纸">
+  <section class="experiment" id="fold" data-title="对折十次数折线">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">2</span>参数控制台</div>
-        <p class="small">每层只用 3 个 ReLU 搭一个“三角帽”：</p>
-        <div class="formula" style="font-size:13px">$$g(x)=2\sigma(x)-4\sigma(x-\tfrac12)+2\sigma(x-1)$$</div>
-        <p class="small">把它复合 $L$ 次：$g_L=g\circ g\circ\cdots\circ g$。每多一层，纸就多对折一次。</p>
+        <p class="small">每层只用 2 个 ReLU 搭一个单峰帐篷：</p>
+        <div class="formula" style="font-size:13px">$$g(x)=\mathrm{ReLU}(2x)-2\,\mathrm{ReLU}(2x-1)$$</div>
+        <p class="small">把它复合 $L$ 次：$g^{\circ L}=g\circ g\circ\cdots\circ g$。每多一层，就像把纸再对折一次。</p>
         <div id="f-L"></div>
-        <div class="small muted">看什么：</div>
-        <div id="f-mode" style="margin:6px 0 4px"></div>
-        <div id="f-ghost"></div>
-        <div class="btn-row">
-          <button class="btn teal" id="f-play">▶ 从 1 层折到 10 层</button>
-        </div>
+        <div class="btn-row"><button class="btn teal" id="f-play">▶ 从 1 层折到 10 层</button></div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <div class="small muted">跟踪一个输入 $x$ 逐层走过的路（练习 3.4）：</div>
+        <div id="f-probe" style="margin:6px 0 4px"></div>
+        <div id="f-x"></div>
       </div>
       <div class="stack">
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c6)">⋀</span><span id="f-title">锯齿波 $g_L(x)$</span><span class="sub" id="f-sub"></span></div>
+          <div class="card-title"><span class="dot" style="background:var(--c6)">⋀</span><span>复合折纸函数 $g^{\circ L}(x)$</span><span class="sub" id="f-sub"></span></div>
           <div class="viz h340" id="f-main"></div>
+          <div class="caption">虚线是上一层 $g^{\circ(L-1)}$。上一层每一段都完整地从 $0$ 走到 $1$（或从 $1$ 走回 $0$），外层 $g$ 在中点 $0.5$ 处把它折返，于是 1 段变 2 段。</div>
         </div>
         <div class="stats" id="f-stats"></div>
         <div class="row2">
           <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c1)">#</span>线性段数：深层 vs 浅层</div>
-            <div class="viz h260" id="f-pieces"></div>
-            <div class="legend"><span><i style="background:var(--c1)"></i>深层：$L$ 层 × 3 个神经元，$2^L$ 段</span><span><i style="background:var(--c2)"></i>浅层：同样 $3L$ 个神经元，至多 $3L+1$ 段</span></div>
+            <div class="card-title"><span class="dot" style="background:var(--c1)">#</span>同样 $2L$ 个 ReLU：深 vs 浅</div>
+            <div class="viz h260" id="f-bars"></div>
+            <div class="legend"><span><i style="background:var(--c1)"></i>深网络 $2^L$ 段</span><span><i style="background:var(--c2)"></i>单隐层浅网络至多 $2L+1$ 段</span></div>
           </div>
           <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--coral)">ε</span>逼近 $x(1-x)$ 的最大误差</div>
-            <div class="viz h260" id="f-err"></div>
-            <div class="legend"><span><i style="background:var(--c1)"></i>深层 $S_L$（实测）</span><span><i style="background:var(--c4)"></i>上界 $\frac{1}{3\cdot4^L}$</span><span><i style="background:var(--c2)"></i>浅层 $3L$ 个神经元（均匀插值，实测）</span></div>
+            <div class="card-title"><span class="dot" style="background:var(--c3)">✍</span>逐层手算 $h_1,h_2,\dots$</div>
+            <div style="overflow-x:auto"><table class="data" id="f-table"></table></div>
+            <div class="caption" id="f-cap"></div>
           </div>
         </div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-          <div class="formula">$$\mathcal{R}_{\text{deep}}(L, M, d) = \Omega\!\left( \left(\frac{M}{d}\right)^{(L-1)d} \, M^d \right) \gg \mathcal{R}_{\text{shallow}}(1, L M, d) = \mathcal{O}\!\left( (LM)^d \right)$$</div>
-          <div class="formula">$$x(1 - x) = \sum_{k=1}^{\infty} \frac{g_k(x)}{4^k},\qquad \big|x(1-x) - S_L(x)\big| \le \sum_{k=L+1}^{\infty} \frac{1}{4^k} = \frac{1}{3 \cdot 4^L}$$</div>
-          <div class="explain">同样的神经元预算，铺在同一层只能多切几刀（段数随神经元个数线性增长）；串成 $L$ 层，每层都把前面的折痕再对折一次，段数按 $2^L$ 翻倍。Yarotsky 用这个锯齿波的加权和，以 $\mathcal O(L)$ 个参数把 $x(1-x)$ 逼近到 $4^{-L}$ 的精度，进而能逼近乘法 $ab=\tfrac12\big((a+b)^2-a^2-b^2\big)$。</div>
+          <div class="formula">$$N_{\text{pieces}}\big(g^{\circ L}\big) = \underbrace{2 \times 2 \times \cdots \times 2}_{L\ \text{层}} = 2^L \;\gg\; N_{\text{pieces}}(\text{同样 } 2L \text{ 个神经元的 1 层宽网络}) \le 2L + 1$$</div>
+          <div class="explain">宽度相加是“做加法”：单隐层里每多 1 个 ReLU 只能多 1 个拐点。深度复合是“做乘方”：每多 1 层，段数乘以 $2$。$L=10$ 时 20 个 ReLU 折出 $1024$ 段（$512$ 个波峰）；$L=30$ 时 60 个 ReLU 就有 $2^{30}=1{,}073{,}741{,}824$ 段，浅网络要十亿个神经元才追得上。代价是斜率也按 $2^L$ 放大，这正是 FAQ 里“叠 100 层会梯度爆炸”的原因。</div>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>点“从 1 层折到 10 层”：每一层都把每个锯齿从中间对折成两个，10 层后有 $2^{10}=1024$ 段，只用了 30 个神经元。</li>
-            <li>同样 30 个神经元放在一层，最多只能切出 31 段。看左下图两种柱子之间的差距。</li>
-            <li>切到“逼近 $x(1-x)$”：每加一层，误差缩小到原来的 $\tfrac14$。浅层网络要达到同样精度，需要约 $2^L$ 个神经元。</li>
+            <li>点“从 1 层折到 10 层”，看段数：$2,4,8,\dots,1024$，而左下图浅网络的柱子只从 $3$ 长到 $21$。</li>
+            <li>把层数放在 $L=2$，依次选 $x=0.25$、$0.5$、$0.75$：输出是 $1,0,1$，这就是 3.4 节算例二的 M 形双峰。</li>
+            <li>把层数放在 $L=3$，分别选 $x=\tfrac18$ 与 $x=\tfrac38$：$\tfrac18\to\tfrac14\to\tfrac12\to1$，$\tfrac38\to\tfrac34\to\tfrac12\to1$，两个都到达波峰；斜率的绝对值是 $2^3=8$。</li>
           </ol>
         </div>
       </div>
@@ -116,58 +120,49 @@
   </section>
 
   <!-- ========================= 实验 3 ========================= -->
-  <section class="experiment" id="activations" data-title="激活函数与 GELU">
+  <section class="experiment" id="act" data-title="磨圆折角的激活函数">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">3</span>参数控制台</div>
         <div class="small muted">显示哪些激活函数：</div>
         <div id="a-checks"></div>
-        <div id="a-z"></div>
-        <div class="small muted">右上图显示：</div>
-        <div id="a-deriv" style="margin:6px 0 4px"></div>
+        <div id="a-x"></div>
         <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
-        <div class="small muted">GELU 的随机门控：拿 $z$ 和噪声 $Z\sim\mathcal N(0,1)$ 比大小，$Z\le z$ 才放行。</div>
-        <div id="a-S"></div>
-        <div class="btn-row"><button class="btn ghost" id="a-resample">重新抽噪声</button></div>
+        <div class="small muted">第二部分：“神经元死亡”。一个神经元 $z=w\,x+b$ 吃进 24 道练习题的输入 $x$，把偏置 $b$ 往负数拧：</div>
+        <div id="d-b"></div>
+        <div id="d-w"></div>
       </div>
       <div class="stack">
         <div class="row2">
           <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c1)">σ</span>激活函数 $\sigma(z)$</div>
+            <div class="card-title"><span class="dot" style="background:var(--c1)">σ</span>激活函数 $\sigma(x)$</div>
             <div class="viz h300" id="a-f"></div>
           </div>
           <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c4)">σ′</span><span id="a-dtitle">一阶导数 $\sigma'(z)$</span></div>
+            <div class="card-title"><span class="dot" style="background:var(--c4)">σ′</span>导数（斜率）$\sigma'(x)$</div>
             <div class="viz h300" id="a-df"></div>
           </div>
         </div>
         <div class="legend" id="a-legend" style="margin-top:-8px"></div>
         <div class="stats" id="a-stats"></div>
-        <div class="row2">
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--amber)">Φ</span>门控：$\sigma(z)=z\cdot\text{门}(z)$</div>
-            <div class="viz h260" id="a-gate"></div>
-            <div class="caption">ReLU 的门是硬开关 $\mathbb I(z&gt;0)$，GELU 的门是 $\Phi(z)$，SiLU 的门是 $\operatorname{sigmoid}(z)$。圆点是 $S$ 次随机硬门控的放行比例。</div>
-          </div>
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--plum)">≈</span>tanh 近似的误差 $\times 10^4$</div>
-            <div class="viz h260" id="a-err"></div>
-            <div class="caption">GPT-2 源码里那行 $0.5z\big[1+\tanh(\sqrt{2/\pi}(z+0.044715z^3))\big]$ 与精确 $z\Phi(z)$ 的差。</div>
-          </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--slate)">☠</span>死亡 ReLU：输入全落在负数区时，导数全是 $0$<span class="sub" id="d-sub"></span></div>
+          <div class="viz h260" id="d-main"></div>
+          <div class="caption">横轴是 24 道题各自算出的 $z_i=w\,x_i+b$；圆点高度是该题的 ReLU 导数（$0$ 或 $1$）。参数 $b$ 收到的梯度正比于这些导数之和，全为 $0$ 时这个旋钮就再也拧不动了。</div>
         </div>
+        <div class="stats" id="d-stats"></div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-          <div class="formula">$$\operatorname{GELU}(z) = z \cdot \mathbb{P}(Z \le z) = z \cdot \Phi(z) = \frac{z}{2}\left[1 + \operatorname{erf}\!\left(\frac{z}{\sqrt{2}}\right)\right] \approx 0.5 z \left[1 + \tanh\!\left(\sqrt{\frac{2}{\pi}}(z + 0.044715 z^3)\right)\right]$$</div>
-          <div class="explain">ReLU 的门控 $\mathbb I(z&gt;0)$ 是一刀切：$-0.0001$ 也被枪毙。GELU 让信号 $z$ 和随机噪声 $Z$ 比大小，赢了才放行，放行概率正是 $\Phi(z)$；信号乘以获胜概率就是 $z\Phi(z)$。它在 $z=0$ 处无限次可导，二阶导数不再是 ReLU 那样的 $\delta$ 尖峰。</div>
-          <p class="small muted">常数 $\sqrt{2/\pi}$ 来自令一阶导数在原点相等：$\Phi'(0)=\frac1{\sqrt{2\pi}}$ 而 $\frac{d}{dz}\frac12\tanh(az)\big|_0=\frac a2$。</p>
+          <div class="formula">$$\mathrm{ReLU}(x)=\max(0,x),\qquad \mathrm{SiLU}(x)=x\,\sigma(x)=\frac{x}{1+e^{-x}},\qquad \mathrm{GELU}(x)=x\,\Phi(x)$$</div>
+          <div class="formula">$$\mathrm{SiLU}'(x)=\sigma(x)\big(1+x\,(1-\sigma(x))\big),\qquad \mathrm{GELU}'(x)=\Phi(x)+x\,\varphi(x)$$</div>
+          <div class="explain">ReLU 在 $x=0$ 处有尖角，代码里直接规定那一点的导数取 $0$（夹在左导数 $0$ 与右导数 $1$ 之间的任何值都是合法的次梯度）。SiLU、GELU 把折角磨圆：$x$ 很大时和 ReLU 一样约等于 $x$，$x$ 很负时趋于 $0$，而在轻微负数区还留着一点斜率，例如 $x=-1$ 时 $\mathrm{SiLU}'(-1)\approx0.072$。</div>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>右上图切到“二阶导数”：ReLU 在 0 处是一根 $\delta$ 尖峰（曲率突变），GELU、SiLU 都是光滑的小山包。</li>
-            <li>把探针 $z$ 拖到 $-0.5$：ReLU 输出 0，GELU 输出约 $-0.154$，负数并没有被一刀切掉。</li>
-            <li>把采样数 $S$ 从 1 拉到 1000：随机硬门控的平均放行率一点点贴合 $\Phi(z)$，这就是“自适应软 Dropout”的含义。</li>
-            <li>看右下图：tanh 近似的误差最大约 $4.7\times10^{-4}$，出现在 $z\approx\pm2.7$ 附近，对神经网络来说几乎无感。</li>
+            <li>把探针拖到 $x=-1$：ReLU 的斜率是 $0$，SiLU 的斜率约 $0.072$，GELU 约 $-0.083$（GELU 在负数区有个小凹谷）。</li>
+            <li>把探针拖到 $x=4$：三条曲线几乎重合，斜率都接近 $1$。</li>
+            <li>第二部分把 $b$ 拧到 $-5$ 以下：24 个圆点全部掉到 $0$，“活着的题目”变成 $0$ 道，梯度为 $0$。拧到 $b=-100$ 时，连 SiLU 的斜率也只剩 $10^{-40}$ 量级。</li>
           </ol>
         </div>
       </div>

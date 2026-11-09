@@ -5,23 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>第 9 章 · 在线实验室</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="assets/lab.css">
+<link rel="stylesheet" href="assets/lab.css?v=20261110">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-<script defer src="assets/lab.js"></script>
+<script defer src="assets/lab.js?v=20261110"></script>
 <script defer src="ch09.js"></script>
 </head>
 <body data-chapter="9">
 <main class="container">
 
   <!-- ========================= 实验 1 ========================= -->
-  <section class="experiment" id="race" data-title="地形赛跑">
+  <section class="experiment" id="race" data-title="窄山谷三车赛跑">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">1</span>选地形、调步长</div>
         <div class="control"><div class="control-head"><span>损失地形</span></div><div id="o-land"></div></div>
         <div class="formula" id="o-formula" style="font-size:13px"></div>
         <div id="o-opts"></div>
+        <div id="o-beta"></div>
         <div id="o-lam"></div>
         <div id="o-noise"></div>
         <div id="o-sigma"></div>
@@ -38,24 +39,30 @@
           <div class="viz h380" id="o-map" style="touch-action:none; cursor:crosshair"></div>
           <div class="legend"><span><i style="background:var(--c4)"></i>SGD</span><span><i style="background:var(--c2)"></i>Momentum</span><span><i style="background:var(--c1)"></i>Adam</span><span><i style="background:var(--c3)"></i>AdamW</span><span><i style="background:var(--ink);height:8px;width:8px;border-radius:50%"></i>全局最小值</span></div>
         </div>
-        <div class="small muted" style="margin:-6px 0 -10px">当前损失差 $\mathcal L(\boldsymbol\theta_t)-\mathcal L^*$：</div>
+        <div class="small muted" style="margin:-6px 0 -10px">当前罚分 $f(x_t,y_t)-f^*$：</div>
         <div class="stats" id="o-stats"></div>
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c1)">L</span>损失随步数下降 $\mathcal L(\boldsymbol\theta_t)-\mathcal L^*$<span class="sub">对数纵轴</span></div>
+          <div class="card-title"><span class="dot" style="background:var(--c1)">L</span>罚分随步数下降 $f(x_t,y_t)-f^*$<span class="sub">对数纵轴</span></div>
           <div class="viz h260" id="o-loss"></div>
         </div>
         <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c2)">✎</span>前两步落点：和书中手算对一对<span class="sub">当前设定</span></div>
+          <div style="overflow-x:auto"><table class="data" id="o-hand"></table></div>
+          <p class="small muted" id="o-handnote" style="margin-bottom:0"></p>
+        </div>
+        <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-          <div class="formula">$$\begin{aligned}\text{SGD:}\quad & \boldsymbol\theta_t=\boldsymbol\theta_{t-1}-\eta\,\mathbf g_t\\ \text{Momentum:}\quad & \mathbf{m}_t = \beta_1 \mathbf{m}_{t-1} + (1 - \beta_1)\mathbf{g}_t,\quad \boldsymbol\theta_t=\boldsymbol\theta_{t-1}-\eta\,\mathbf m_t\\ \text{AdamW:}\quad & \boldsymbol{\theta}_t = \boldsymbol{\theta}_{t-1} - \eta \Big( \frac{\hat{\mathbf{m}}_t}{\sqrt{\hat{\mathbf{v}}_t} + \varepsilon} + \lambda \boldsymbol{\theta}_{t-1} \Big)\end{aligned}$$</div>
-          <p class="small muted">这里 $\beta_1=0.9,\ \beta_2=0.999,\ \varepsilon=10^{-8}$；Adam 即 $\lambda=0$ 的 AdamW。SGD 在峡谷里的步长受最陡方向限制（曲率 4.4 要求 $\eta&lt;2/4.4$），平缓方向只能慢慢挪；Adam 用 $\sqrt{\hat{\mathbf v}_t}$ 把每个坐标的步长都归一到 $\eta$ 量级，近似符号梯度下降。</p>
+          <div class="formula">$$\begin{aligned}\text{SGD:}\quad & w_{t+1}=w_t-\eta\,g_t\\ \text{动量法（书中手算写法）:}\quad & m_t = \beta\, m_{t-1} + g_t,\quad w_{t+1}=w_t-\eta\,m_t\\ \text{AdamW:}\quad & w_{t+1} = w_t - \eta \Big( \frac{\hat{m}_t}{\sqrt{\hat{v}_t} + \epsilon} + \lambda w_t \Big)\end{aligned}$$</div>
+          <p class="small muted">AdamW 取 $\beta_1=0.9,\ \beta_2=0.999,\ \epsilon=10^{-8}$；Adam 即 $\lambda=0$ 的 AdamW。窄山谷 $f=x^2+25y^2$ 的南北斜率是 $50y$，SGD 每步把 $y$ 乘上 $1-50\eta$，所以 $\eta$ 必须小于 $2/50=0.04$；东西方向每步只缩 $2\eta$，慢得像蜗牛。动量法这里用书中 9.1 节手算的写法（不乘 $1-\beta$），它等价于把式 (9.1) 的学习率放大 $\frac{1}{1-\beta}$ 倍。</p>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>峡谷地形（书中 $\mathcal L=0.12\theta_1^2+2.2\theta_2^2$）：SGD 在两侧峭壁之间来回撞墙；把它的 $\eta$ 调过 $0.45$，立刻发散。</li>
-            <li>鞍点地形：起点在脊线附近时梯度几乎为 0，SGD 在鞍点前停留很久，损失曲线出现长长的平台；Adam 把微小梯度放大成正常步长，很快滚下去。勾选梯度噪声也能帮 SGD 逃离。</li>
-            <li>多井地形：默认起点下 SGD、Adam、AdamW 都掉进左上方的浅坑，只有带惯性的 Momentum 冲过山脊落进右侧的全局最低谷。</li>
-            <li>香蕉谷（Rosenbrock）：调大 AdamW 的 $\lambda$，它会停在偏向原点的位置，因为权重衰减与损失梯度在拔河。</li>
+            <li>默认设定就是书中的手算：SGD 两步落在 $(9.3,-0.75)\to(8.649,0.5625)$，动量法（$\beta=0.5$）落在 $(9.3,-0.75)\to(8.299,-0.3125)$，AdamW（$\eta=1$，$\lambda=0.1$）第一步落在 $(8.0,-0.1)$。看上面的对照表。</li>
+            <li>把 SGD 的 $\eta$ 从 $0.035$ 拖到 $0.041$：南北方向每步乘 $-1.05$，越撞越高直到炸飞；拖回 $0.038$ 附近又能收敛。</li>
+            <li>把动量系数 $\beta$ 拖到 0：动量法和 SGD 的轨迹完全重合；拖到 0.8，东西方向冲得更快，但南北方向开始多晃几下。</li>
+            <li>AdamW 五步就冲到谷底附近，之后在谷底两侧来回晃：把它的 $\eta$ 调到 0.1 再跑，晃动小了，但要多走好些步。这正是 9.3 节要让学习率退火的原因。</li>
+            <li>其余三种地形是附赠的：鞍点地形里 Adam 把微小梯度放大成正常步长，很快滚下去；多井地形里只有带惯性的动量法冲进右侧的全局最低谷。</li>
           </ol>
         </div>
       </div>
@@ -63,12 +70,14 @@
   </section>
 
   <!-- ========================= 实验 2 ========================= -->
-  <section class="experiment" id="decay" data-title="L2 ≠ 权重衰减">
+  <section class="experiment" id="decay" data-title="两个记账本与橡皮筋">
     <div class="lab-grid">
       <div class="card controls">
-        <div class="card-title"><span class="dot">2</span>书中手算算例</div>
-        <div id="d-theta"></div>
-        <div id="d-g"></div>
+        <div class="card-title"><span class="dot">2</span>书中“的”与“熵”</div>
+        <div id="d-gde"></div>
+        <div id="d-gsh"></div>
+        <div id="d-b2"></div>
+        <div id="d-w"></div>
         <div id="d-lam"></div>
         <div id="d-eta"></div>
         <div class="btn-row"><button class="btn ghost" id="d-book">恢复书中数值</button></div>
@@ -80,12 +89,14 @@
       </div>
       <div class="stack">
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c1)">1</span>第 1 步更新逐行对照<span class="sub">$\beta_1=0.9,\ \beta_2=0.99$，忽略 $\varepsilon$</span></div>
-          <div class="small" style="font-weight:650;color:var(--c3)">AdamW（解耦权重衰减）</div>
-          <div class="formula" id="d-w" style="border-left-color:var(--c3)"></div>
-          <div class="small" style="font-weight:650;color:var(--c4)">Adam + $L_2$ 正则（耦合）</div>
+          <div class="card-title"><span class="dot" style="background:var(--c1)">1</span>第 1 步的两个记账本<span class="sub">$\beta_1=0.9$，忽略 $\epsilon$</span></div>
+          <div class="formula" id="d-bias" style="border-left-color:var(--c1)"></div>
+          <div class="caption">不做偏差校正时，第 1 步的步幅是 $\frac{(1-\beta_1)g}{\sqrt{(1-\beta_2)g^2}}=\frac{1-\beta_1}{\sqrt{1-\beta_2}}$，与斜率大小无关；书中 $\beta_2=0.999$ 时恰好是 $3.162$。除以 $1-\beta^t$ 之后，两个字都还原成 $1$。</div>
+          <div class="small" style="font-weight:650;color:var(--c4);margin-top:10px">Adam + $L_2$：橡皮筋拉力混进分子，一起被 $\sqrt{\hat v}$ 除</div>
           <div class="formula" id="d-l2" style="border-left-color:var(--c4)"></div>
-          <div class="caption">偏差修正后 $\hat m_1=g_1$、$\hat v_1=g_1^2$，与 $\beta_1,\beta_2$ 无关，所以第 1 步的自适应项恰好是 $\operatorname{sign}(g_1)$。</div>
+          <div class="small" style="font-weight:650;color:var(--c3)">AdamW：把 $-\eta\lambda w$ 拎到除法外面</div>
+          <div class="formula" id="d-wd" style="border-left-color:var(--c3)"></div>
+          <div class="caption">与书中一样，这里把“平时的斜率大小” $\sqrt{\hat v}$ 取成各自的 $|g|$：“的”字是 $10$，“熵”字是 $0.001$。</div>
         </div>
         <div class="stats" id="d-stats"></div>
         <div class="card">
@@ -110,8 +121,9 @@
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>书中数值下 AdamW 得到 $\theta_1=1.80$，Adam+$L_2$ 得到 $1.90$：第一步 $\hat m_1/\sqrt{\hat v_1}=\operatorname{sign}(\tilde g_1)=1$，正则项被分子分母约得一干二净。</li>
-            <li>把梯度 $g_1$ 拖到 $-10$（损失想把 $\theta$ 往外推）：AdamW 得到 $2.00$，衰减恰好抵消外推；Adam+$L_2$ 得到 $2.10$，与完全不加正则的 Adam 一模一样。</li>
+            <li>书中数值：两个字未校正的步幅都是 $3.162$，校正后都是 $1.000$；$L_2$ 只把“的”字拉回 $0.02$，却把“熵”字拉回 $200$，AdamW 两个字都拉回 $0.2$。</li>
+            <li>把 $\beta_2$ 拖到 $0.9999$：未校正的步幅变成 $0.1/\sqrt{0.0001}=10$；而校正后的步幅纹丝不动，还是 $1$。</li>
+            <li>把“熵”字的斜率从 $0.001$ 拖到 $10$：两个字的 $L_2$ 拉力变得一样，说明 $L_2$ 的“欺软怕硬”完全来自分母 $\sqrt{\hat v}$。</li>
             <li>看长程实验：AdamW 图里六条线完全重合，都是 $(1-\eta\lambda)^t$；Adam+$L_2$ 图里的线按梯度尺度散开，小梯度坐标被迅速清零，大梯度坐标几乎不衰减。</li>
             <li>调大“梯度尺度倍率”：Adam+$L_2$ 的曲线整体变平，越来越多坐标的正则形同虚设。</li>
           </ol>
@@ -121,7 +133,7 @@
   </section>
 
   <!-- ========================= 实验 3 ========================= -->
-  <section class="experiment" id="schedule" data-title="学习率调度设计台">
+  <section class="experiment" id="schedule" data-title="预热余弦时刻表">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">3</span>设计你的调度</div>
@@ -151,12 +163,14 @@
         </div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-          <div class="formula">$$\eta_t = \begin{cases}\eta_{\max} \cdot \dfrac{t}{T_{\text{warmup}}}, & 1 \le t \le T_{\text{warmup}} \\[0.8em] \eta_{\min} + \dfrac{1}{2}(\eta_{\max} - \eta_{\min})\Big(1 + \cos\Big(\dfrac{t - T_{\text{warmup}}}{T_{\max} - T_{\text{warmup}}}\pi\Big)\Big), & T_{\text{warmup}} &lt; t \le T_{\max}\end{cases}$$</div>
-          <p class="small muted">$\tfrac12(1+\cos x)=\cos^2(x/2)$ 在 $x=0$ 和 $x=\pi$ 处导数都为 0，所以余弦段在峰值和终点两端都平滑。WSD（预热-稳定-衰减）把高学习率一直保持到最后一小段再快速降下，便于中途加数据续训；逆平方根是原版 Transformer 的调度，衰减很慢，终点仍偏高。</p>
+          <div class="formula">$$\eta_t = \begin{cases}\eta_{\max} \cdot \dfrac{t}{T_w}, & 0 \le t \le T_w \\[0.8em] \eta_{\min} + \dfrac{1}{2}(\eta_{\max} - \eta_{\min})\Big(1 + \cos\Big(\dfrac{t - T_w}{T_{\max} - T_w}\pi\Big)\Big), & T_w &lt; t \le T_{\max}\end{cases}$$</div>
+          <p class="small muted">$\tfrac12(1+\cos x)=\cos^2(x/2)$ 在 $x=0$ 和 $x=\pi$ 处导数都为 0，所以余弦段在离开峰值和到达终点时都很平缓。WSD（预热-稳定-衰减）把高学习率一直保持到最后一小段再快速降下，便于中途加数据续训；逆平方根是原版 Transformer 的调度，衰减很慢，终点仍偏高。</p>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
+            <li>默认设定就是书中 9.3 节的算例（$\eta_{\max}=0.001$、$\eta_{\min}=0.0001$、$T_w=2000$、$T_{\max}=10000$）：对照表第一行依次是 $t=1000$ 的 $0.0005$、$t=6000$ 的 $0.00055$ 与 $t=10000$ 的 $0.0001$。</li>
+            <li>练习 9.3：把预热比例拉到 0、$\eta_{\min}/\eta_{\max}$ 拉到 0、总步数拉到 4000，在曲线上点 1000、2000、3000 步，$\eta_t/\eta_{\max}$ 依次是 $0.854$、$0.500$、$0.146$，乘上 $10$ 就是书中的 $8.535$、$5$、$1.465$。</li>
             <li>比较余弦和 WSD 的损失曲线：WSD 在稳定段一直停在较高的噪声地板上，进入衰减段后损失陡降，最终与余弦相差无几。</li>
             <li>把 $\eta_{\min}/\eta_{\max}$ 从 0.1 拉到 0：余弦终点更低，玩具损失也更低；拉到 0.5 则噪声地板明显抬高。</li>
             <li>把峰值 $\eta_{\max}$ 推过 $1.2\times10^{-3}$：玩具步长超过 $2/h_{\max}=2$，最陡的方向开始发散，损失曲线向上冲。</li>

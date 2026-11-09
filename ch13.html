@@ -5,20 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>第 13 章 · 在线实验室</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="assets/lab.css">
+<link rel="stylesheet" href="assets/lab.css?v=20261110">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-<script defer src="assets/lab.js"></script>
+<script defer src="assets/lab.js?v=20261110"></script>
 <script defer src="ch13.js"></script>
 </head>
 <body data-chapter="13">
 <main class="container">
 
   <!-- ========================= 实验 1 ========================= -->
-  <section class="experiment" id="forward" data-title="前向加噪的一步跃迁">
+  <section class="experiment" id="forward" data-title="一步加雪花">
     <div class="lab-grid">
       <div class="card controls">
-        <div class="card-title"><span class="dot">1</span>把雕像砸成石块</div>
+        <div class="card-title"><span class="dot">1</span>往月牙里一步步掺雪花</div>
         <div class="small muted">数据形状：</div>
         <div id="f-shape" style="margin:6px 0 8px"></div>
         <div class="small muted">噪声调度 $\beta_t$：</div>
@@ -48,20 +48,23 @@
         </div>
         <div class="stats" id="f-stats"></div>
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--amber)">✍</span>书中手算：两步加噪 = 一步跃迁<span class="sub">各模拟 20000 次</span></div>
+          <div class="card-title"><span class="dot" style="background:var(--amber)">✍</span>书中手算：两步加雪花 = 一步跃迁<span class="sub">$x_0=10$，$\alpha_1=\alpha_2=0.9$，各模拟 20000 次</span></div>
           <div class="viz h260" id="f-two"></div>
           <div class="legend">
-            <span><i style="background:var(--c2)"></i>两步走：$x_1 = 0.9x_0+\sqrt{0.19}\,\epsilon_1$，$x_2=\frac89 x_1+\frac{\sqrt{17}}{9}\epsilon_2$</span>
-            <span><i style="background:var(--c6)"></i>一步跳：$x_2=0.8x_0+0.6\,\epsilon$</span>
-            <span><i style="background:var(--navy)"></i>理论 $\mathcal N(8,\,0.6^2)$</span>
+            <span><i style="background:var(--c2)"></i>两步走：$x_1 = \sqrt{0.9}\,x_0+\sqrt{0.1}\,\epsilon_1$，$x_2=\sqrt{0.9}\,x_1+\sqrt{0.1}\,\epsilon_2$</span>
+            <span><i style="background:var(--c6)"></i>一步跳：$x_2=0.9\,x_0+\sqrt{0.19}\,\epsilon$</span>
+            <span><i style="background:var(--navy)"></i>理论 $\mathcal N(9,\,0.19)$</span>
           </div>
           <div class="caption" id="f-two-cap"></div>
+          <div class="small muted" style="margin-top:12px">再算一个像素：拖动累计保留系数 $\bar\alpha_t$ 和这次抽到的雪花 $\epsilon$（书中取 $0.64$ 与 $+2.0$）。</div>
+          <div id="f-calc"></div>
+          <div class="stats" id="f-calc-stats"></div>
         </div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
           <div class="formula">$$\mathbf{x}_t = \sqrt{\bar{\alpha}_t}\,\mathbf{x}_0 + \sqrt{1 - \bar{\alpha}_t}\,\boldsymbol{\epsilon}, \qquad \boldsymbol{\epsilon} \sim \mathcal{N}(\mathbf{0}, \mathbf{I}), \quad \bar{\alpha}_t = \prod_{s=1}^{t} (1 - \beta_s)$$</div>
           <p class="small muted">两个系数的平方和恒为 1，所以加噪是一次“保持总方差的旋转”：令 $\cos\phi_t=\sqrt{\bar\alpha_t}$，则 $\mathbf x_t=\cos\phi_t\,\mathbf x_0+\sin\phi_t\,\boldsymbol\epsilon$。线性调度取 $\beta_t$ 从 $10^{-4}$ 均匀增到 $0.02$；余弦调度（Nichol 与 Dhariwal）直接规定 $\bar\alpha_t=\cos^2\!\big(\frac{t/T+s}{1+s}\cdot\frac\pi2\big)/\cos^2\!\big(\frac{s}{1+s}\cdot\frac\pi2\big)$，$s=0.008$，信号消失得更均匀。</p>
-          <p class="small muted">两步合并时，两个独立高斯噪声的方差相加：$\alpha_2(1-\alpha_1)+(1-\alpha_2)=1-\bar\alpha_2$。书中取 $\bar\alpha_2=0.64$，恰好凑成勾股数 $0.8^2+0.6^2=1$。</p>
+          <p class="small muted">两步合并时，两个独立高斯噪声的方差相加：$\alpha_2(1-\alpha_1)+(1-\alpha_2)=1-\bar\alpha_2$。书中两步都取 $\alpha=0.9$：$0.9\times0.1+0.1=0.19=1-0.81$。再取 $\bar\alpha_t=0.64$，恰好凑成勾股数 $0.8^2+0.6^2=1$，$x_0=10$、$\epsilon=2$ 时一步算出 $x_t=8+1.2=9.2$。</p>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
@@ -69,7 +72,8 @@
             <li>把 $t$ 拖到 300 左右：线性调度下月牙已经糊成一团，换成余弦调度再看，形状还清晰得多。</li>
             <li>看右图两条曲线的交点：$\bar\alpha_t=0.5$ 时信号和噪声各占一半，两种调度的交点分别在哪个 $t$？</li>
             <li>点“播放”：$t=1000$ 时点云已经是标准正态的圆形团，原来的颜色完全打乱。</li>
-            <li>看下方直方图：两步走和一步跳的均值都是 8.0、标准差都是 0.6，分布完全重合。</li>
+            <li>看下方直方图：两步走和一步跳的均值都是 9.0、标准差都是 $\sqrt{0.19}\approx0.436$，分布完全重合。</li>
+            <li>把 $\bar\alpha_t$ 拖到 0.64、$\epsilon$ 拖到 2.0：读出书中的 $0.8$、$0.6$ 和 $x_t=9.2$。</li>
           </ol>
         </div>
       </div>
@@ -77,7 +81,7 @@
   </section>
 
   <!-- ========================= 实验 2 ========================= -->
-  <section class="experiment" id="reverse" data-title="得分场与反向去噪">
+  <section class="experiment" id="reverse" data-title="猜雪花与指路箭头">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">2</span>顺着得分场把沙子刷掉</div>
@@ -106,6 +110,12 @@
         </div>
         <div class="stats" id="r-stats"></div>
         <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--amber)">✍</span>书中手算：从 $9.2$ 一把还原小猫<span class="sub">$\sqrt{\bar\alpha_t}=0.8$，$\sqrt{1-\bar\alpha_t}=0.6$</span></div>
+          <div id="r-calc"></div>
+          <div class="stats" id="r-calc-stats"></div>
+          <div class="caption">真雪花 $\epsilon=2.0$ 把 $x_0=10$ 糊成 $x_t=0.8\times10+0.6\times2.0=9.2$。拖动网络猜出的雪花 $\hat\epsilon_\theta$：书中取 $1.95$，还原出 $\hat x_0=(9.2-0.6\times1.95)/0.8=10.0375$。还原误差恰好是“猜错量”的 $0.6/0.8=0.75$ 倍（符号相反）；指路箭头就是 $-\hat\epsilon_\theta/0.6$。</div>
+        </div>
+        <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
           <div class="formula">$$\nabla_{\mathbf{x}_t} \ln q(\mathbf{x}_t) = -\frac{\boldsymbol{\epsilon}_{\boldsymbol{\theta}^*}(\mathbf{x}_t, t)}{\sqrt{1 - \bar{\alpha}_t}},\qquad \hat{\mathbf x}_0=\mathbb E[\mathbf x_0\mid\mathbf x_t]=\frac{\mathbf x_t+(1-\bar\alpha_t)\nabla\ln q(\mathbf x_t)}{\sqrt{\bar\alpha_t}}$$</div>
           <div class="formula">$$\text{DDPM：}\ \mathbf x_{t-1}=\frac{1}{\sqrt{\alpha_t}}\Big(\mathbf x_t+\beta_t\nabla\ln q(\mathbf x_t)\Big)+\sqrt{\tilde\beta_t}\,\mathbf z,\qquad \text{朗之万：}\ \mathbf x\leftarrow\mathbf x+\tfrac{\eta}{2}\nabla\ln q_t(\mathbf x)+\sqrt{\eta}\,\mathbf z$$</div>
@@ -125,7 +135,7 @@
   </section>
 
   <!-- ========================= 实验 3 ========================= -->
-  <section class="experiment" id="flow" data-title="流匹配与 CFG 引导">
+  <section class="experiment" id="flow" data-title="直线滑梯与 CFG">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">3</span>走直线，再加一点引导</div>
@@ -141,6 +151,17 @@
         <div class="caption">两个月牙各是一类（$c=$ 上 / 下）。所有速度场与得分场都由混合高斯精确算出，两种方法都用最朴素的欧拉法、同样的起点噪声。</div>
       </div>
       <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--amber)">✍</span>书中手算：一维直线滑梯<span class="sub">雪花 $\epsilon=2$ → 清晰像素 $x_1=10$</span></div>
+          <div id="s-t"></div>
+          <div class="viz h260" id="s-plot"></div>
+          <div class="legend">
+            <span><i style="background:var(--c6)"></i>$x_t=(1-t)\cdot2+t\cdot10$，速度恒为 $8$</span>
+            <span><i style="background:var(--c4)"></i>问 13.1 的训练直线 $-2\to10$</span>
+            <span><i style="background:var(--c1)"></i>训练直线 $2\to-10$</span>
+          </div>
+          <div class="stats" id="s-stats"></div>
+        </div>
         <div class="row2">
           <div class="card">
             <div class="card-title"><span class="dot" style="background:var(--c4)">~</span>扩散：概率流 ODE</div>
@@ -173,18 +194,19 @@
         <div class="stats" id="cfg-stats"></div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-          <div class="formula">$$\mathbf{x}_t = (1 - t)\mathbf{x}_0 + t\mathbf{x}_1, \qquad \mathcal{L}_{\text{FM}} = \mathbb{E}\big\| \mathbf{v}_{\boldsymbol{\theta}}(\mathbf{x}_t, t) - (\mathbf{x}_1 - \mathbf{x}_0) \big\|_2^2, \qquad \mathbf{x}_{t-\Delta t} = \mathbf{x}_t - \Delta t\, \mathbf{v}_{\boldsymbol{\theta}}(\mathbf{x}_t, t)$$</div>
+          <div class="formula">$$\mathbf{x}_t = (1 - t)\boldsymbol{\epsilon} + t\mathbf{x}_1, \qquad \mathcal{L}_{\text{FM}} = \mathbb{E}\big\| \hat{\mathbf{v}}_{\theta}(\mathbf{x}_t, t) - (\mathbf{x}_1 - \boldsymbol{\epsilon}) \big\|_2^2, \qquad \mathbf{x}_{t+\Delta t} = \mathbf{x}_t + \Delta t\, \hat{\mathbf{v}}_{\theta}(\mathbf{x}_t, t)$$</div>
           <div class="formula">$$\tilde{\boldsymbol{\epsilon}}_{\boldsymbol{\theta}}(\mathbf{x}_t, c) = \boldsymbol{\epsilon}_{\boldsymbol{\theta}}(\mathbf{x}_t, \varnothing) + w \big(\boldsymbol{\epsilon}_{\boldsymbol{\theta}}(\mathbf{x}_t, c) - \boldsymbol{\epsilon}_{\boldsymbol{\theta}}(\mathbf{x}_t, \varnothing)\big)$$</div>
-          <p class="small muted">最优速度场是条件期望 $\mathbf v^*(\mathbf x,t)=\mathbb E[\mathbf x_1-\mathbf x_0\mid\mathbf x_t=\mathbf x]$。训练时每一对 $(\mathbf x_0,\mathbf x_1)$ 走的都是匀速直线（右图虚线）；生成时的轨迹是许多直线的平均，在双峰数据上仍会拐弯（Rectified Flow 用“重新配对”把它进一步拉直）。它的优势是沿途速度均匀。扩散的概率流 ODE $\frac{d\mathbf x}{dt}=-\frac12\beta(t)\big(\mathbf x+\nabla\ln q_t(\mathbf x)\big)$ 前半程几乎不动，最后一小段才急转直下，欧拉法步子一大就冲过头。左图用的是与 DDPM 线性调度对应的连续时间版本（$\beta$ 从 0.1 增到 20）。</p>
-          <p class="small muted">对流匹配，速度 $\mathbf v=(\boldsymbol\epsilon-\mathbf x_t)/(1-t)$ 是 $\boldsymbol\epsilon$ 的仿射函数，所以引导公式可以原样作用在 $\mathbf v$ 上（SD3、Flux 就是这样做的）。$w=0$ 是无条件生成，$w=1$ 是普通条件生成，$w&gt;1$ 相当于从 $p(\mathbf x)\,p(c\mid\mathbf x)^w$ 采样。</p>
+          <p class="small muted">和书中一样，$t=0$ 是雪花 $\boldsymbol\epsilon$，$t=1$ 是清晰数据 $\mathbf x_1$。最优速度场是条件期望 $\mathbf v^*(\mathbf x,t)=\mathbb E[\mathbf x_1-\boldsymbol\epsilon\mid\mathbf x_t=\mathbf x]$。训练时每一对 $(\boldsymbol\epsilon,\mathbf x_1)$ 走的都是匀速直线（右图虚线）；生成时的轨迹是许多直线的平均，在双峰数据上仍会拐弯（Rectified Flow 用“重新配对”把它进一步拉直）。它的优势是沿途速度均匀。扩散的概率流 ODE $\frac{d\mathbf x}{dt}=-\frac12\beta(t)\big(\mathbf x+\nabla\ln q_t(\mathbf x)\big)$ 前半程几乎不动，最后一小段才急转直下，欧拉法步子一大就冲过头。左图用的是与 DDPM 线性调度对应的连续时间版本（$\beta$ 从 0.1 增到 20）。</p>
+          <p class="small muted">对流匹配，速度 $\mathbf v=(\mathbf x_t-\hat{\boldsymbol\epsilon})/t$ 是 $\hat{\boldsymbol\epsilon}$ 的仿射函数，所以引导公式可以原样作用在 $\mathbf v$ 上（SD3、Flux 就是这样做的）。$w=0$ 是无条件生成，$w=1$ 是普通条件生成，$w&gt;1$ 相当于从 $p(\mathbf x)\,p(c\mid\mathbf x)^w$ 采样。</p>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
             <li>把欧拉步数调到 4：右边已经是两道清晰的月牙，左边还是一团雾。看误差曲线，两边各要多少步才达标？</li>
             <li>打开“显示生成轨迹”：右边轨迹上的点间距均匀；左边的点前半程挤成一团，最后一步跨得很远。欧拉法最怕这种忽慢忽快。</li>
-            <li>把步数调到 1：流匹配会把所有点都送到数据的平均位置，因为 $t=1$ 时 $\mathbf v^*=\mathbf x_1-\mathbb E[\mathbf x_0]$。</li>
-            <li>把 $w$ 从 0 拉到 1 再到 3、8：先从两类混合变成一类，再越来越挤向远离另一类的一侧，最后冲出数据流形。</li>
+            <li>把步数调到 1：流匹配会把所有点都送到数据的平均位置，因为 $t=0$ 时 $\mathbf v^*=\mathbb E[\mathbf x_1]-\boldsymbol\epsilon$，一步欧拉正好落在 $\mathbb E[\mathbf x_1]$。</li>
+            <li>把 $w$ 从 0 拉到 1 再到 5、8：先从两类混合变成一类，再越来越挤向远离另一类的一侧，最后冲出数据流形。下方“书中手算”一格同步显示 $-1.0+w\times(-0.4)$，$w=5$ 时正是 $-3.0$。</li>
+            <li>在最上面的直线滑梯里拖动 $t$：位置依次是 $2,4,6,8,10$，速度一直是 $8$；两条训练直线在 $t=1/6$、$x=0$ 处交叉，这就是问 13.1 的“路口”。</li>
           </ol>
         </div>
       </div>

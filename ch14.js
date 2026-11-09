@@ -1,7 +1,7 @@
-/* 第 14 章：无穷维函数空间上的神经网络算子：交互实验 */
+/* 第 14 章：神经算子 DeepONet 与傅里叶神经算子（FNO）：交互实验 */
 (function () {
   const { COLORS: C, M } = LAB;
-  LAB.page({ bookRef: '对应书中 §14.2 DeepONet · §14.3 FNO · §14.4 PINN · §14.5 热方程手算算例' });
+  LAB.page({ bookRef: '对应书中 §14.1 铁棒热量散开算子 · §14.2 DeepONet · §14.3 FNO 与 PINO · 练习 14.1–14.2' });
 
   const $ = (s) => document.querySelector(s);
   const FONT = getComputedStyle(document.body).getPropertyValue('--font');
@@ -31,113 +31,107 @@
   const piFmt = (v) => ({ 0: '0', 1: 'π/2', 2: 'π', 3: '3π/2', 4: '2π' }[Math.round(v / (Math.PI / 2))] || '');
   const niceMax = (m) => { const e = Math.pow(10, Math.floor(Math.log10(m))); return [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].map((v) => v * e).find((v) => v >= m) || m; };
 
-  /* ================= 实验 1：热方程的频域一步解 ================= */
-  const KM = 8;
-  let A = new Array(KM + 1).fill(0), B = new Array(KM + 1).fill(0);
+  /* ================= 实验 1：铁棒的热量散开算子（两端 0 度，正弦模态） ================= */
+  const KM = 8, PI = Math.PI, KAP0 = Math.log(2) / (0.1 * PI * PI); // 书中：t=0.1 时 k=1 的乘子恰为 0.5
+  let B = new Array(KM + 1).fill(0);
   function preset1(i) {
-    A = new Array(KM + 1).fill(0); B = new Array(KM + 1).fill(0);
-    if (i === 0) { A[1] = 3; A[3] = 2; }
-    else if (i === 1) { for (let k = 1; k <= KM; k += 2) B[k] = 8 / (Math.PI * k); }
-    else if (i === 2) { A[0] = 0.5; for (let k = 1; k <= KM; k++) A[k] = (k % 2 ? -1 : 1) * Math.exp(-((0.35 * k) ** 2) / 2); }
-    else { const R = LAB.rng(100 + Math.floor(Math.random() * 1000)); for (let k = 1; k <= KM; k++) { A[k] = +(R.normal() * 1.6 / k).toFixed(2); B[k] = +(R.normal() * 1.6 / k).toFixed(2); } }
+    B = new Array(KM + 1).fill(0);
+    if (i === 0) { B[1] = 10; }
+    else if (i === 1) { for (let k = 1; k <= KM; k += 2) B[k] = +(4 * 8 / (PI * k)).toFixed(3); }
+    else if (i === 2) { for (let k = 1; k <= KM; k++) B[k] = +(2 * 3 * Math.sin(k * PI * 0.3) * Math.exp(-((0.25 * k) ** 2))).toFixed(3); }
+    else { const R = LAB.rng(100 + Math.floor(Math.random() * 1000)); for (let k = 1; k <= KM; k++) B[k] = +(R.normal() * 6 / k).toFixed(2); }
   }
-  const hPreset = LAB.segmented('#h-preset', ['书中算例', '方波', '尖峰', '随机'], 0, (i) => { preset1(i); update1(); });
-  const hK = LAB.slider('#h-kappa', { label: '热扩散系数 $\\kappa$', min: 0.01, max: 0.5, step: 0.01, value: 0.1, fmt: (v) => v.toFixed(2), onInput: () => update1() });
-  const hT = LAB.slider('#h-t', { label: '时间 $t$', min: 0, max: 3, step: 0.01, value: 1, fmt: (v) => v.toFixed(2), onInput: () => update1() });
-  const hPlay = anim('heat', () => { const t = Math.min(3, hT.get() + 0.012); hT.set(t); update1(); return t < 3; }, () => { $('#h-play').innerHTML = '▶ 播放'; });
-  $('#h-play').onclick = () => { if (hPlay.running) { hPlay.stop(); return; } if (hT.get() >= 3) hT.set(0); hPlay.start(); $('#h-play').innerHTML = '❚❚ 暂停'; };
-  const mult = (k) => Math.exp(-hK.get() * k * k * hT.get());
-  const u0 = (x) => { let s = A[0]; for (let k = 1; k <= KM; k++) s += A[k] * Math.cos(k * x) + B[k] * Math.sin(k * x); return s; };
-  const ut = (x) => { let s = A[0]; for (let k = 1; k <= KM; k++) { const m = mult(k); s += m * (A[k] * Math.cos(k * x) + B[k] * Math.sin(k * x)); } return s; };
-  // 显式有限差分（周期边界）
+  LAB.segmented('#h-preset', ['书中铁棒', '方波', '尖峰', '随机'], 0, (i) => { preset1(i); update1(); });
+  const hK = LAB.slider('#h-kappa', { label: '导热系数 $\\kappa$', min: 0.05, max: 2, step: 0.0001, value: +KAP0.toFixed(4), fmt: (v) => v.toFixed(4), onInput: () => update1() });
+  const hT = LAB.slider('#h-t', { label: '时间 $t$', min: 0, max: 0.5, step: 0.005, value: 0.1, fmt: (v) => v.toFixed(3), onInput: () => update1() });
+  const hPlay = anim('heat', () => { const t = Math.min(0.5, hT.get() + 0.002); hT.set(t); update1(); return t < 0.5; }, () => { $('#h-play').innerHTML = '▶ 播放'; });
+  $('#h-play').onclick = () => { if (hPlay.running) { hPlay.stop(); return; } if (hT.get() >= 0.5) hT.set(0); hPlay.start(); $('#h-play').innerHTML = '❚❚ 暂停'; };
+  const mult = (k) => Math.exp(-hK.get() * (k * PI) ** 2 * hT.get());
+  const u0 = (x) => { let s = 0; for (let k = 1; k <= KM; k++) s += B[k] * Math.sin(k * PI * x); return s; };
+  const ut = (x) => { let s = 0; for (let k = 1; k <= KM; k++) s += mult(k) * B[k] * Math.sin(k * PI * x); return s; };
+  // 显式有限差分（两端固定为 0 度）
   function fd() {
-    const N = 64, dx = TAU / N, kap = hK.get(), t = hT.get();
+    const N = 64, dx = 1 / N, kap = hK.get(), t = hT.get();
     const dtMax = 0.45 * dx * dx / kap, steps = t > 0 ? Math.ceil(t / dtMax) : 0, dt = steps ? t / steps : 0, r = kap * dt / (dx * dx);
-    let u = Float64Array.from({ length: N }, (_, j) => u0(j * dx)), v = new Float64Array(N);
-    for (let n = 0; n < steps; n++) { for (let j = 0; j < N; j++) v[j] = u[j] + r * (u[(j + 1) % N] - 2 * u[j] + u[(j + N - 1) % N]); const w = u; u = v; v = w; }
-    let err = 0; for (let j = 0; j < N; j++) err = Math.max(err, Math.abs(u[j] - ut(j * dx)));
-    return { xs: M.range(N).map((j) => j * dx), u, steps, err };
+    let u = Float64Array.from({ length: N + 1 }, (_, j) => u0(j * dx)), v = new Float64Array(N + 1);
+    u[0] = 0; u[N] = 0;
+    for (let n = 0; n < steps; n++) { for (let j = 1; j < N; j++) v[j] = u[j] + r * (u[j + 1] - 2 * u[j] + u[j - 1]); v[0] = 0; v[N] = 0; const w = u; u = v; v = w; }
+    let err = 0; for (let j = 0; j <= N; j++) err = Math.max(err, Math.abs(u[j] - ut(j * dx)));
+    return { xs: M.range(N + 1).map((j) => j * dx), u, steps, err };
   }
-  let xq = 0.6, physPlot = null, specPlot = null, FD = null;
-  const hs = { m1: LAB.stat('#h-stats', '$k=1$ 乘子 $e^{-\\kappa t}$', 'teal'), m3: LAB.stat('#h-stats', '$k=3$ 乘子 $e^{-9\\kappa t}$', 'coral'), st: LAB.stat('#h-stats', '有限差分需要的步数', 'amber'), er: LAB.stat('#h-stats', '两种解的最大差', 'plum') };
+  let xq = 0.25, physPlot = null, specPlot = null, FD = null;
+  const hs = { m1: LAB.stat('#h-stats', '$k=1$ 乘子 $e^{-\\kappa\\pi^2 t}$', 'teal'), q: LAB.stat('#h-stats', '查询点 $u(y,t)$', 'navy'), m3: LAB.stat('#h-stats', '$k=3$ 乘子 $e^{-9\\kappa\\pi^2 t}$', 'coral'), st: LAB.stat('#h-stats', '有限差分需要的步数', 'amber'), er: LAB.stat('#h-stats', '两种解的最大差', 'plum') };
+  const X_TICKS = [0, 0.25, 0.5, 0.75, 1];
   const phys = LAB.canvas('#h-phys', (ctx, w, h) => {
-    const xs = M.linspace(0, TAU, 361), y0 = xs.map(u0), y1 = xs.map(ut);
-    const Y = niceMax(Math.max(1, ...y0.map(Math.abs)) * 1.1);
-    const P = new LAB.Plot(ctx, w, h, { xmin: 0, xmax: TAU, ymin: -Y, ymax: Y, xtickValues: PI_TICKS, xfmt: piFmt, xlabel: 'x', ylabel: '温度 u', pad: { l: 42, r: 12, t: 12, b: 36 } }).axes();
+    const xs = M.linspace(0, 1, 301), y0 = xs.map(u0), y1 = xs.map(ut);
+    const Y = niceMax(Math.max(1, ...y0.map(Math.abs), ...y1.map(Math.abs)) * 1.1);
+    const P = new LAB.Plot(ctx, w, h, { xmin: 0, xmax: 1, ymin: -Y, ymax: Y, xtickValues: X_TICKS, xlabel: '位置 x / y（米）', ylabel: '温度 u', pad: { l: 42, r: 12, t: 12, b: 36 } }).axes();
     physPlot = P;
     P.hline(0, GREY, null, 1);
     P.line(xs, y0, GREY, 1.8, [5, 4]);
     P.area(xs, y1, C.c4, 0.07, 0);
     P.line(xs, y1, C.c4, 2.6);
     if (FD) P.points(FD.xs.filter((_, j) => j % 2 === 0), Array.from(FD.u).filter((_, j) => j % 2 === 0), C.c6, 2.6);
+    // 普通网络焊死的 3 个格点
+    [0, 0.5, 1].forEach((x) => { [u0(x), ut(x)].forEach((v) => { ctx.save(); ctx.fillStyle = C.slate; ctx.fillRect(P.tx(x) - 4, P.ty(v) - 4, 8, 8); ctx.restore(); }); });
     P.vline(xq, C.navy, [3, 3], 1.2);
     P.points([xq], [ut(xq)], C.navy, 5.5, '#fff');
-    P.text(xq + (xq > 5 ? -0.08 : 0.08), Y * 0.86, `y = (${xq.toFixed(2)}, ${hT.get().toFixed(2)})`, C.navy, xq > 5 ? 'right' : 'left', 'middle', NUM);
+    P.text(xq + (xq > 0.75 ? -0.015 : 0.015), Y * 0.86, `y = ${xq.toFixed(3)}，u = ${ut(xq).toFixed(3)}`, C.navy, xq > 0.75 ? 'right' : 'left', 'middle', NUM);
   });
-  drag(phys.canvas, (type, px) => { if (type === 'up' || !physPlot) return; xq = M.clamp(physPlot.ix(px), 0, TAU); phys.redraw(); renderDeepONet(); }, 'crosshair');
+  drag(phys.canvas, (type, px) => { if (type === 'up' || !physPlot) return; xq = M.clamp(physPlot.ix(px), 0, 1); phys.redraw(); renderDeepONet(); hs.q.set(ut(xq).toFixed(3)); }, 'crosshair');
   let dragK = null;
   const spec = LAB.canvas('#h-spec', (ctx, w, h) => {
-    const Mx = dragK ? dragK.M : niceMax(Math.max(1, ...A.map(Math.abs), ...B.map(Math.abs)) * 1.2);
-    const P = new LAB.Plot(ctx, w, h, { xmin: -0.6, xmax: KM + 0.6, ymin: -Mx, ymax: Mx, xtickValues: M.range(KM + 1), xfmt: (v) => 'k=' + v, yticks: 4, pad: { l: 40, r: 10, t: 24, b: 26 } }).axes();
+    const Mx = dragK ? dragK.M : niceMax(Math.max(1, ...B.map(Math.abs)) * 1.2);
+    const P = new LAB.Plot(ctx, w, h, { xmin: 0.4, xmax: KM + 0.6, ymin: -Mx, ymax: Mx, xtickValues: M.range(KM).map((i) => i + 1), xfmt: (v) => 'k=' + v, yticks: 4, pad: { l: 40, r: 10, t: 24, b: 26 } }).axes();
     specPlot = P;
     P.hline(0, GREY, null, 1);
-    const bw = Math.min(18, (P.tx(1) - P.tx(0)) * 0.3);
-    const off = (bw * 0.6) / (P.tx(1) - P.tx(0));
-    for (let k = 0; k <= KM; k++) {
-      const m = k === 0 ? 1 : mult(k);
-      [[A[k], C.c1, k === 0 ? 0 : -off], [B[k], C.c2, off]].forEach(([v, col, dx], idx) => {
-        if (k === 0 && idx === 1) return;
-        const X = P.tx(k + dx), Y0 = P.ty(0), Y1 = P.ty(v);
-        ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 1.3; ctx.setLineDash([3, 2]); ctx.strokeRect(X - bw / 2, Math.min(Y0, Y1), bw, Math.abs(Y1 - Y0)); ctx.restore();
-        P.bars([k + dx], [v * m], col, bw * 0.78);
-      });
-      if (k > 0) P.text(k, Mx * 1.0, '×' + m.toFixed(3), m < 0.5 ? C.coral : C.leaf, 'center', 'bottom', '600 10.5px Avenir Next, sans-serif');
+    const bw = Math.min(22, (P.tx(1) - P.tx(0)) * 0.4);
+    for (let k = 1; k <= KM; k++) {
+      const m = mult(k), v = B[k];
+      const X = P.tx(k), Y0 = P.ty(0), Y1 = P.ty(v);
+      ctx.save(); ctx.strokeStyle = C.c2; ctx.lineWidth = 1.3; ctx.setLineDash([3, 2]); ctx.strokeRect(X - bw / 2, Math.min(Y0, Y1), bw, Math.abs(Y1 - Y0)); ctx.restore();
+      P.bars([k], [v * m], C.c2, bw * 0.78);
+      P.text(k, Mx * 1.0, '×' + m.toFixed(3), m < 0.5 ? C.coral : C.leaf, 'center', 'bottom', '600 10.5px Avenir Next, sans-serif');
     }
   });
   drag(spec.canvas, (type, px, py) => {
     if (type === 'up') { dragK = null; spec.redraw(); return; }
     const P = specPlot; if (!P) return;
-    if (type === 'down') {
-      const k = M.clamp(Math.round(P.ix(px)), 0, KM);
-      dragK = { k, which: k === 0 || px < P.tx(k) ? 'A' : 'B', M: P.o.ymax };
-    }
+    if (type === 'down') { const k = M.clamp(Math.round(P.ix(px)), 1, KM); dragK = { k, M: P.o.ymax }; }
     let v = M.clamp(P.iy(py), -dragK.M, dragK.M); if (Math.abs(v) < 0.04 * dragK.M) v = 0;
-    (dragK.which === 'A' ? A : B)[dragK.k] = +v.toFixed(2);
+    B[dragK.k] = +v.toFixed(2);
     update1();
   }, 'ns-resize');
   const fmtN = (v) => (Math.abs(v - Math.round(v)) < 1e-9 ? String(Math.round(v)) : v.toFixed(2));
   function renderFormula() {
     const kap = hK.get(), t = hT.get(), terms = [], approx = [];
-    if (Math.abs(A[0]) > 1e-9) { terms.push(fmtN(A[0])); approx.push(A[0].toFixed(3)); }
-    for (let k = 1; k <= KM; k++) [[A[k], `\\cos ${k === 1 ? '' : k}x`], [B[k], `\\sin ${k === 1 ? '' : k}x`]].forEach(([c, f]) => {
-      if (Math.abs(c) < 1e-9) return;
-      const ex = +(kap * k * k * t).toFixed(4);
+    for (let k = 1; k <= KM; k++) {
+      const c = B[k]; if (Math.abs(c) < 1e-9) continue;
+      const f = `\\sin ${k === 1 ? '' : k}\\pi x`, ex = +(kap * (k * PI) ** 2 * t).toFixed(3);
       terms.push(`${fmtN(c)}\\,e^{-${ex}}${f}`); approx.push(`${(c * mult(k)).toFixed(3)}${f}`);
-    });
+    }
     const join = (a) => (a.length > 4 ? a.slice(0, 4).join('+') + '+\\cdots' : a.join('+')).replace(/\+-/g, '-');
-    const tex = `\\begin{aligned} u(x,${+t.toFixed(2)}) &= ${join(terms) || '0'} \\\\ &\\approx ${join(approx) || '0'} \\end{aligned}`;
-    $('#h-formula').innerHTML = LAB.tex('\\hat a_k\\ \\xrightarrow{\\ \\times\\, e^{-\\kappa k^2 t}\\ }\\ \\hat u_k(t)\\ \\xrightarrow{\\ \\mathcal F^{-1}\\ }\\ u(x,t)', true) + LAB.tex(tex, true);
+    const tex = `\\begin{aligned} u(x,${+t.toFixed(3)}) &= ${join(terms) || '0'} \\\\ &\\approx ${join(approx) || '0'} \\end{aligned}`;
+    $('#h-formula').innerHTML = LAB.tex('\\hat a_k\\ \\xrightarrow{\\ \\times\\, e^{-\\kappa (k\\pi)^2 t}\\ }\\ \\hat u_k(t)\\ \\xrightarrow{\\ \\text{叠回正弦波}\\ }\\ u(x,t)', true) + LAB.tex(tex, true);
   }
   function renderDeepONet() {
     const kap = hK.get(), t = hT.get(), rows = [];
-    if (Math.abs(A[0]) > 1e-9) rows.push(['1', A[0], 1]);
     for (let k = 1; k <= KM; k++) {
-      const m = Math.exp(-kap * k * k * t);
-      if (Math.abs(A[k]) > 1e-9) rows.push([`cos ${k === 1 ? '' : k}x`, A[k], m * Math.cos(k * xq)]);
-      if (Math.abs(B[k]) > 1e-9) rows.push([`sin ${k === 1 ? '' : k}x`, B[k], m * Math.sin(k * xq)]);
+      const m = Math.exp(-kap * (k * PI) ** 2 * t);
+      if (Math.abs(B[k]) > 1e-9) rows.push([`sin ${k === 1 ? '' : k}πy`, B[k], m * Math.sin(k * PI * xq)]);
     }
     const sum = rows.reduce((s, r) => s + r[1] * r[2], 0);
     const shown = rows.slice(0, 6);
     $('#h-deeponet').innerHTML = `<table class="data"><tr><th>模态</th><th>分支 $b_k(a)$</th><th>主干 $t_k(y)$</th><th>乘积</th></tr>` +
       shown.map((r) => `<tr><td>${r[0]}</td><td class="num">${r[1].toFixed(3)}</td><td class="num">${r[2].toFixed(3)}</td><td class="num">${(r[1] * r[2]).toFixed(3)}</td></tr>`).join('') +
       (rows.length > 6 ? `<tr><td colspan="4" class="muted">… 另有 ${rows.length - 6} 项</td></tr>` : '') +
-      `<tr><td colspan="3"><b>内积 $\\langle \\mathbf b(a),\\mathbf t(y)\\rangle = u(x,t)$</b></td><td class="num"><b>${sum.toFixed(3)}</b></td></tr></table>` +
-      `<p class="muted" style="margin:8px 0 0">分支网读入初始函数，输出系数 $b_k=\\hat a_k$；主干网只读坐标 $y=(x,t)$，输出基函数 $t_k(y)=e^{-\\kappa k^2t}\\cos kx$（或 $\\sin kx$）。热方程的解算子恰好就是一个精确的 DeepONet。</p>`;
+      `<tr><td colspan="3"><b>内积 $\\langle \\mathbf b(a),\\mathbf t(y)\\rangle = u(y,t)$</b></td><td class="num"><b>${sum.toFixed(3)}</b></td></tr></table>` +
+      `<p class="muted" style="margin:8px 0 0">分支网读入初始温度，输出系数 $b_k=\\hat a_k$；主干网只读坐标 $y$（和时间 $t$），输出琴弦 $t_k(y)=e^{-\\kappa (k\\pi)^2t}\\sin k\\pi y$。铁棒的热量散开算子恰好就是一个精确的 DeepONet：书中算例只有一根琴弦，$b_1=10$，$t_1(0.25)=0.5\\sin(\\pi/4)$。</p>`;
     LAB.renderMath($('#h-deeponet'));
   }
   function update1() {
     FD = fd();
-    hs.m1.set(mult(1).toFixed(3)); hs.m3.set(mult(3).toFixed(3));
+    hs.m1.set(mult(1).toFixed(3)); hs.m3.set(mult(3).toFixed(4)); hs.q.set(ut(xq).toFixed(3));
     hs.st.set(`${FD.steps}<small>步 vs 频域 1 次</small>`); hs.er.set(M.fmt(FD.err, 2));
     phys.redraw(); spec.redraw(); renderFormula(); renderDeepONet();
   }
@@ -147,28 +141,34 @@
   const PHI = M.range(13).map((i) => (i * 2.399) % TAU);
   // 跳变点取左右极限的平均值 0（傅里叶级数在间断点收敛到的值）
   const FUNCS = [
+    (x) => 2 + 3 * Math.cos(x) + 0.5 * Math.cos(10 * x),
+    (x) => 1 + 2 * Math.cos(x) - 3 * Math.sin(x) + 0.8 * Math.cos(8 * x),
     (x) => { const m = ((x % TAU) + TAU) % TAU; return Math.abs(m) < 1e-9 || Math.abs(m - Math.PI) < 1e-9 || Math.abs(m - TAU) < 1e-9 ? 0 : m < Math.PI ? 1 : -1; },
     (x) => { const m = ((x % TAU) + TAU) % TAU; return m < 1e-9 || TAU - m < 1e-9 ? 0 : m / Math.PI - 1; },
     (x) => { let s = Math.sin(x) + 0.5 * Math.cos(2 * x); for (let i = 0; i < 13; i++) s += 0.09 * Math.sin((18 + i) * x + PHI[i]); return s; },
   ];
   const ND = 512;
+  const NF = FUNCS.length; // 最后一项是手绘
   let nPre = 0, drawn = null, lastDraw = null;
   const fIn = (x) => {
-    if (nPre < 3) return FUNCS[nPre](x);
+    if (nPre < NF) return FUNCS[nPre](x);
     const u = ((((x % TAU) + TAU) % TAU) / TAU) * ND, i = Math.floor(u), f = u - i;
     return drawn[i % ND] * (1 - f) + drawn[(i + 1) % ND] * f;
   };
-  const nPreSeg = LAB.segmented('#n-preset', ['方波', '锯齿波', '毛刺正弦', '手绘'], 0, (i) => {
-    if (i === 3 && !drawn) drawn = Float64Array.from({ length: ND }, (_, j) => FUNCS[nPre](TAU * j / ND));
-    nPre = i; update2();
+  const nPreSeg = LAB.segmented('#n-preset', ['书中算例', '练习 14.2', '方波', '锯齿波', '毛刺正弦', '手绘'], 0, (i) => {
+    if (i === NF && !drawn) drawn = Float64Array.from({ length: ND }, (_, j) => FUNCS[nPre](TAU * j / ND));
+    nPre = i;
+    if (i === 0) { nK.set(1); nW.set(2); rSeg.set(3); return; }
+    if (i === 1) { nK.set(1); nW.set(0.5); rSeg.set(4); return; }
+    update2();
   });
   const GRIDS = [32, 64, 128, 256];
   let NG = 128;
   LAB.segmented('#n-grid', GRIDS.map(String), 2, (i) => { NG = GRIDS[i]; nK.setRange(0, NG / 2); update2(); });
-  const nK = LAB.slider('#n-k', { label: '保留的最高频率 $k_{\\max}$', min: 0, max: 64, step: 1, value: 8, onInput: () => update2() });
-  let rMode = 0;
-  LAB.segmented('#n-r', ['恒等', '热核', '求导 $ik$'], 0, (i) => { rMode = i; update2(); });
-  const nW = LAB.slider('#n-w', { label: '局部权重 $W$', min: -1, max: 1, step: 0.05, value: 0, fmt: (v) => v.toFixed(2), onInput: () => update2() });
+  const nK = LAB.slider('#n-k', { label: '保留的最高频率 $k_{\\max}$', min: 0, max: 64, step: 1, value: 1, onInput: () => update2() });
+  let rMode = 3;
+  const rSeg = LAB.segmented('#n-r', ['恒等', '热核', '求导 $ik$', '书中 $\\mathrm{diag}(2.5,2)$', '练习 14.2'], 3, (i) => { rMode = i; update2(); });
+  const nW = LAB.slider('#n-w', { label: '局部权重 $W$', min: -1, max: 2.5, step: 0.05, value: 2, fmt: (v) => v.toFixed(2), onInput: () => update2() });
   const nAct = LAB.checkbox('#n-act', '经过激活函数 $\\sigma=\\operatorname{GELU}$', false, () => update2());
   function dft(v, kmax) { // 实傅里叶系数 A_k, B_k（k = 0..kmax）
     const N = v.length, Ak = new Float64Array(kmax + 1), Bk = new Float64Array(kmax + 1);
@@ -186,6 +186,8 @@
     for (let k = 0; k < a.length; k++) {
       if (rMode === 1) { const m = Math.exp(-0.05 * k * k); a[k] *= m; b[k] *= m; }
       else if (rMode === 2) { const ak = Ak[k], bk = Bk[k]; a[k] = k * bk; b[k] = -k * ak; }
+      else if (rMode === 3) { const m = k === 0 ? 2.5 : k === 1 ? 2 : 1; a[k] *= m; b[k] *= m; }
+      else if (rMode === 4) { if (k === 0) { a[k] *= 2; } else if (k === 1) { const ak = Ak[k], bk = Bk[k]; a[k] = -bk; b[k] = ak; } }
     }
     return { a, b };
   }
@@ -217,7 +219,7 @@
   drag(recon.canvas, (type, px, py) => {
     if (type === 'up') { lastDraw = null; return; }
     const P = reconPlot; if (!P) return;
-    if (nPre !== 3) { drawn = Float64Array.from({ length: ND }, (_, j) => fIn(TAU * j / ND)); nPre = 3; nPreSeg.el.querySelectorAll('button').forEach((b, j) => b.classList.toggle('active', j === 3)); }
+    if (nPre !== NF) { drawn = Float64Array.from({ length: ND }, (_, j) => fIn(TAU * j / ND)); nPre = NF; nPreSeg.el.querySelectorAll('button').forEach((b, j) => b.classList.toggle('active', j === NF)); }
     const x = M.clamp(P.ix(px), 0, TAU - 1e-9), y = M.clamp(P.iy(py), P.o.ymin, P.o.ymax);
     const i1 = Math.round(x / TAU * ND) % ND;
     if (type === 'down' || !lastDraw) drawn[i1] = y;
@@ -247,7 +249,7 @@
     P.line(xsC, cyc(L.out), C.navy, 2.6);
   });
   function renderPipe() {
-    const rName = ['恒等', '热核 $e^{-0.05k^2}$', '求导 $ik$'][rMode];
+    const rName = ['恒等', '热核 $e^{-0.05k^2}$', '求导 $ik$', '$\\mathrm{diag}(2.5,2)$', '练习 14.2'][rMode];
     const chip = (t, on) => `<span class="fno-chip ${on ? 'on' : ''}">${t}</span>`, ar = '<span class="fno-arrow">→</span>';
     $('#n-pipe').innerHTML = chip('$v(x)$', true) + ar + chip('FFT', true) + ar + chip(`截断 $k\\le${S2.K}$`, true) + ar + chip(`$\\times\\,\\mathbf R_k$：${rName}`, rMode > 0) + ar + chip('iFFT', true) + ar +
       chip(`$+\\,W v(x)$，$W=${nW.get().toFixed(2)}$`, nW.get() !== 0) + ar + chip('$\\sigma$', nAct.get()) + ar + chip('$v_{l+1}(x)$', true);
@@ -269,7 +271,8 @@
     // 分辨率无关性：同一组 R_k 用在 1024 点网格上
     const ref = layer(1024, K), step = 1024 / N;
     let d = 0, sc = 0; L.out.forEach((o, j) => { d = Math.max(d, Math.abs(o - ref.out[j * step])); sc = Math.max(sc, Math.abs(ref.out[j * step])); });
-    $('#n-res-cap').innerHTML = `同一组谱权重分别用在 $N=${N}$ 与 $N=1024$ 的网格上，在共同网格点处输出的最大差为 <b>${M.fmt(d, 2)}</b>（相对 ${M.fmt(d / Math.max(sc, 1e-12) * 100, 2)}%）。${d / Math.max(sc, 1e-12) > 0.01 ? '差距来自粗网格上的高频混叠：输入里高于 N/2 的频率被折叠到低频。' : '只要网格能分辨输入的主要频率，结果就与分辨率无关。'}`;
+    const bookNote = nPre === 0 && rMode === 3 && K === 1 && Math.abs(nW.get() - 2) < 1e-9 && !nAct.get() ? '书中算例：输出正是 $9+12\\cos x+\\cos 10x$。' : nPre === 1 && rMode === 4 && K === 1 && Math.abs(nW.get() - 0.5) < 1e-9 && !nAct.get() ? '练习 14.2：输出正是 $2.5+4\\cos x+0.5\\sin x+0.4\\cos 8x$。' : '';
+    $('#n-res-cap').innerHTML = bookNote + `同一组谱权重分别用在 $N=${N}$ 与 $N=1024$ 的网格上，在共同网格点处输出的最大差为 <b>${M.fmt(d, 2)}</b>（相对 ${M.fmt(d / Math.max(sc, 1e-12) * 100, 2)}%）。${d / Math.max(sc, 1e-12) > 0.01 ? '差距来自粗网格上的高频混叠：输入里高于 N/2 的频率被折叠到低频。' : '只要网格能分辨输入的主要频率，结果就与分辨率无关。'}`;
     LAB.renderMath($('#n-res-cap'));
     renderPipe();
     recon.redraw(); specN.redraw(); layerCv.redraw();
@@ -427,4 +430,18 @@
     resCv.redraw(); sliceCv.redraw(); lossCv.redraw(); actCv.redraw();
   }
   resetNet(); update3();
+
+  // 书中手算：两端 u(0)=0、u(1)=10 都对上的甲 10y 与乙 10y^2；当前候选 u=(1-c)·10y+c·10y^2，u''=20c
+  const bs = { d: LAB.stat('#b-stats', '端点数据误差', 'leaf'), u2: LAB.stat('#b-stats', "$u''(y)=20c$", 'amber'), p: LAB.stat('#b-stats', "物理罚分 $(u'')^2$", 'coral') };
+  const bC = LAB.slider('#b-c', { label: '模型乙的成分 $c$（$0$ = 甲，$1$ = 乙）', min: 0, max: 1, step: 0.01, value: 1, fmt: (v) => v.toFixed(2), onInput: () => { bPlot.redraw(); updB(); } });
+  function updB() { const c = bC.get(); bs.d.set('0'); bs.u2.set((20 * c).toFixed(1)); bs.p.set((400 * c * c).toFixed(1)); }
+  const bPlot = LAB.canvas('#b-plot', (ctx, w, h) => {
+    const P = new LAB.Plot(ctx, w, h, { xmin: 0, xmax: 1, ymin: 0, ymax: 11, xlabel: '位置 y', ylabel: '温度 u', xtickValues: [0, 0.25, 0.5, 0.75, 1], ytickValues: [0, 5, 10], pad: { l: 42, r: 12, t: 10, b: 38 } }).axes();
+    const ys = M.linspace(0, 1, 101), c = bC.get();
+    P.line(ys, ys.map((y) => 10 * y), C.c6, 1.6, [5, 4]);
+    P.line(ys, ys.map((y) => 10 * y * y), C.c4, 1.6, [5, 4]);
+    P.line(ys, ys.map((y) => (1 - c) * 10 * y + c * 10 * y * y), C.navy, 2.6);
+    P.points([0, 1], [0, 10], C.amber, 5.5, '#fff');
+  });
+  updB();
 })();

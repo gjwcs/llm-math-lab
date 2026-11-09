@@ -1,451 +1,356 @@
-/* 第 4 章：核方法、特征映射与 NTK · 交互实验 */
+/* 第 4 章：核方法与 NTK · 交互实验（与第二版正文 §4.1–4.4、练习 4.1/4.3/4.4 的数字一致） */
 (function () {
   const { COLORS: C, M } = LAB;
-  LAB.page({ bookRef: '对应书中 §4.2 核技巧 · §4.3 神经正切核 · §4.4 异或手算 · §4.6 随机傅里叶特征' });
+  LAB.page({ bookRef: '对应书中 §4.1 提床单切异或 · §4.2 核技巧与注意力指数核 · §4.3 神经正切核 · §4.4 手算算例 · 练习 4.1、4.3、4.4' });
   // 窄屏下长公式与宽表格改为横向滚动，不撑破版面
   document.querySelectorAll('.formula, [style*="overflow-x"]').forEach((f) => { f.style.width = '0'; f.style.minWidth = '100%'; });
   const FONT = getComputedStyle(document.body).getPropertyValue('--font');
   const NUMF = getComputedStyle(document.body).getPropertyValue('--font-num');
-  const isActive = (sec) => sec.classList.contains('active');
-  function schedule(fn) { let p = false; return () => { if (p) return; p = true; requestAnimationFrame(() => { p = false; fn(); }); }; }
+  const r4 = (v) => (Math.abs(v) < 5e-10 ? '0' : String(+v.toFixed(4))).replace('-', '−');
+  const r2 = (v) => (Math.abs(v) < 5e-10 ? '0.00' : v.toFixed(2)).replace('-', '−');
+  const tm = (v) => (Math.abs(v) < 5e-10 ? '0' : String(+v.toFixed(2))); // 公式里用 ASCII 减号
   function pointer(cv, h) {
     cv.style.touchAction = 'none';
     const pos = (e) => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
     let active = false;
     cv.addEventListener('pointerdown', (e) => { if (h.down && h.down(pos(e)) !== false) { active = true; cv.setPointerCapture(e.pointerId); e.preventDefault(); } });
-    cv.addEventListener('pointermove', (e) => { if (active) h.move && h.move(pos(e)); else h.hover && h.hover(pos(e)); });
-    const end = (e) => { if (active) { active = false; h.up && h.up(pos(e)); } };
+    cv.addEventListener('pointermove', (e) => { if (active) h.move && h.move(pos(e)); });
+    const end = () => { if (active) { active = false; h.up && h.up(); } };
     cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
   }
-  // 线性方程组（高斯消元，部分主元）
-  function solve(A, b) {
-    const n = b.length, a = A.map((r, i) => r.concat([b[i]]));
-    for (let k = 0; k < n; k++) {
-      let p = k; for (let i = k + 1; i < n; i++) if (Math.abs(a[i][k]) > Math.abs(a[p][k])) p = i;
-      [a[k], a[p]] = [a[p], a[k]];
-      const d = a[k][k] || 1e-12;
-      for (let i = k + 1; i < n; i++) { const f = a[i][k] / d; for (let j = k; j <= n; j++) a[i][j] -= f * a[k][j]; }
-    }
-    const x = new Array(n).fill(0);
-    for (let k = n - 1; k >= 0; k--) { let s = a[k][n]; for (let j = k + 1; j < n; j++) s -= a[k][j] * x[j]; x[k] = s / (a[k][k] || 1e-12); }
-    return x;
-  }
-  // 对称矩阵特征分解（Jacobi 旋转），返回按特征值降序排列的 {vals, vecs[k][i]}
-  function eigSym(A, n) {
-    const a = Float64Array.from(A), V = new Float64Array(n * n); for (let i = 0; i < n; i++) V[i * n + i] = 1;
-    for (let sweep = 0; sweep < 80; sweep++) {
-      let off = 0, tot = 0; for (let p = 0; p < n; p++) for (let q = 0; q < n; q++) { const v = a[p * n + q] * a[p * n + q]; tot += v; if (p !== q) off += v; }
-      if (off < 1e-26 * tot) break;
-      for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) {
-        const apq = a[p * n + q]; if (Math.abs(apq) < 1e-300) continue;
-        const th = (a[q * n + q] - a[p * n + p]) / (2 * apq), t = (th >= 0 ? 1 : -1) / (Math.abs(th) + Math.sqrt(th * th + 1)), c = 1 / Math.sqrt(t * t + 1), s = t * c;
-        for (let k = 0; k < n; k++) { const x = a[k * n + p], y = a[k * n + q]; a[k * n + p] = c * x - s * y; a[k * n + q] = s * x + c * y; }
-        for (let k = 0; k < n; k++) { const x = a[p * n + k], y = a[q * n + k]; a[p * n + k] = c * x - s * y; a[q * n + k] = s * x + c * y; }
-        for (let k = 0; k < n; k++) { const x = V[k * n + p], y = V[k * n + q]; V[k * n + p] = c * x - s * y; V[k * n + q] = s * x + c * y; }
-      }
-    }
-    const idx = M.range(n).sort((i, j) => a[j * n + j] - a[i * n + i]);
-    return { vals: idx.map((i) => a[i * n + i]), vecs: idx.map((i) => M.range(n).map((k) => V[k * n + i])) };
-  }
 
-  /* ================= 实验 1：核技巧 ================= */
-  const sec1 = document.querySelector('#kernel-trick');
-  const BOOK = [[1, 1, 1], [-1, -1, 1], [1, -1, -1], [-1, 1, -1]];
-  const CIRC = [[0.3, 0.2, 1], [-0.2, -0.4, 1], [1.2, 0.3, -1], [-0.5, 1.15, -1]];
-  let ds = 0, pts = [], seedK = 2, yaw = 0.7, pitch = 0.35, spinOn = true, spinning = false, drag2 = -1, drag3 = null, model = null;
-  const phi = (x) => [x[0] * x[0], Math.SQRT2 * x[0] * x[1], x[1] * x[1]];
-  LAB.segmented('#k-data', ['异或 XOR', '同心圆'], 0, (i) => { ds = i; build(); });
-  const sExtra = LAB.slider('#k-extra', { label: '每簇附加的随机点', min: 0, max: 20, step: 1, value: 6, onInput: () => build() });
-  const sNoise = LAB.slider('#k-noise', { label: '随机点的散布', min: 0.05, max: 0.6, step: 0.01, value: 0.25, fmt: (v) => v.toFixed(2), onInput: () => build() });
-  LAB.checkbox('#k-spin', '三维视图自动旋转', true, (v) => { spinOn = v; ensureSpin(); });
-  document.querySelector('#k-reset').onclick = () => { sExtra.set(0); build(); };
-  document.querySelector('#k-reseed').onclick = () => { seedK++; build(); };
-  function build() {
-    const R = LAB.rng(seedK * 17 + ds), n = sExtra.get(), s = sNoise.get();
-    pts = (ds === 0 ? BOOK : CIRC).map((p) => p.slice());
-    if (ds === 0) BOOK.forEach(([x, y, c]) => { for (let i = 0; i < n; i++) pts.push([x + s * R.normal(), y + s * R.normal(), c]); });
-    else for (let i = 0; i < 2 * n; i++) {
-      const r1 = Math.sqrt(R()) * (0.35 + s), t1 = R() * 2 * Math.PI; pts.push([r1 * Math.cos(t1), r1 * Math.sin(t1), 1]);
-      const r2 = 1.25 + s * (R() - 0.5) * 1.2, t2 = R() * 2 * Math.PI; pts.push([r2 * Math.cos(t2), r2 * Math.sin(t2), -1]);
+  /* ================= 实验 1：提起床单切异或 ================= */
+  const sec1 = document.querySelector('#lift');
+  const XOR = [[1, 1, 1], [-1, -1, 1], [-1, 1, -1], [1, -1, -1]];
+  const RING = [[1, 0, 1], [0, 1, 1], [-1, 0, 1], [0, -1, 1], [2, 0, -1], [0, 2, -1], [-2, 0, -1], [0, -2, -1]];
+  const NAMES = { xor: ['红豆 1', '红豆 2', '蓝豆 3', '蓝豆 4'], ring: ['内圈 1', '内圈 2', '内圈 3', '内圈 4', '外圈 1', '外圈 2', '外圈 3', '外圈 4'] };
+  let ds = 0, mode = 0, yaw = 0.75, pitch = 0.42, spin = true, dragging = null;
+  const pts = () => (ds === 0 ? XOR : RING);
+  const lift = (p) => (ds === 0 ? p[0] * p[1] : p[0] * p[0] + p[1] * p[1]);
+  LAB.segmented('#l-data', ['异或四颗豆', '圆环八颗豆（练习 4.1）'], 0, (i) => { ds = i; sC.setRange(ds === 0 ? -1.5 : 0, ds === 0 ? 1.5 : 5, 0.05); sC.set(ds === 0 ? 0 : 2.5); descLift(); upd(); });
+  LAB.segmented('#l-mode', ['桌面上切一刀', '提起床单再切'], 0, (i) => { mode = i; document.querySelector('#l-flat').style.display = i === 0 ? '' : 'none'; document.querySelector('#l-lift').style.display = i === 1 ? '' : 'none'; upd(); ensureSpin(); });
+  const sW1 = LAB.slider('#l-w1', { label: '$w_1$', min: -3, max: 3, step: 0.1, value: 1, fmt: (v) => v.toFixed(1), onInput: () => upd() });
+  const sW2 = LAB.slider('#l-w2', { label: '$w_2$', min: -3, max: 3, step: 0.1, value: 0.5, fmt: (v) => v.toFixed(1), onInput: () => upd() });
+  const sB = LAB.slider('#l-b', { label: '$b$', min: -3, max: 3, step: 0.1, value: 0.3, fmt: (v) => v.toFixed(1), onInput: () => upd() });
+  const sC = LAB.slider('#l-c', { label: '水平刀面的高度 $c$', min: -1.5, max: 1.5, step: 0.05, value: 0, fmt: (v) => v.toFixed(2), onInput: () => upd() });
+  LAB.checkbox('#l-spin', '三维视图自动旋转', true, (v) => { spin = v; ensureSpin(); });
+  function descLift() {
+    const d = document.querySelector('#l-liftdesc');
+    d.innerHTML = ds === 0 ? '多算一列 $x_3=x_1x_2$，在高度 $x_3=c$ 处横切：$x_3&gt;c$ 判为红豆。书中取 $c=0$，即 $F=x_3$。' : '多算一列 $x_3=x_1^2+x_2^2$（碗），在高度 $x_3=c$ 处横切：$x_3&lt;c$ 判为红豆。练习 4.1 取 $c=2.5$，即 $F=-x_3+2.5$。';
+    LAB.renderMath(d);
+  }
+  descLift();
+  const score = (p) => { // >0 判红
+    if (mode === 0) return sW1.get() * p[0] + sW2.get() * p[1] + sB.get();
+    const c = sC.get(), z = lift(p); return ds === 0 ? z - c : c - z;
+  };
+  const wrong = () => pts().filter((p) => (score(p) > 0 ? 1 : -1) !== p[2]).length;
+  document.querySelector('#l-search').onclick = () => {
+    let best = null;
+    for (let a = -30; a <= 30; a += 1) for (let b2 = -30; b2 <= 30; b2 += 1) for (let c0 = -30; c0 <= 30; c0 += 1) {
+      const w1 = a / 10, w2 = b2 / 10, bb = c0 / 10;
+      const e = pts().filter((p) => ((w1 * p[0] + w2 * p[1] + bb) > 0 ? 1 : -1) !== p[2]).length;
+      if (!best || e < best.e) best = { e, w1, w2, bb };
     }
-    fitK();
-  }
-  function lsFit(feat) { // 最小二乘 + 微小岭，返回权重与准确率
-    const F = pts.map((p) => feat(p).concat([1])), d = F[0].length;
-    const A = M.range(d).map((i) => M.range(d).map((j) => F.reduce((s, f) => s + f[i] * f[j], 0) + (i === j ? 1e-6 : 0)));
-    const b = M.range(d).map((i) => F.reduce((s, f, k) => s + f[i] * pts[k][2], 0));
-    const w = solve(A, b);
-    const acc = pts.filter((p, k) => Math.sign(M.dot(F[k], w) || 1e-9) === p[2]).length / pts.length;
-    return { w, acc };
-  }
-  const sk = [LAB.stat('#k-stats', '数据点', ''), LAB.stat('#k-stats', '二维里用直线分类', 'coral'), LAB.stat('#k-stats', '三维里用平面分类', 'leaf'), LAB.stat('#k-stats', '核值 $(\\mathbf x_1^\\top\\mathbf x_2)^2$', 'plum')];
-  function fitK() {
-    model = lsFit((p) => phi(p));
-    const lin = lsFit((p) => [p[0], p[1]]);
-    sk[0].set(`${pts.length}<small>个</small>`);
-    sk[1].set(`${(lin.acc * 100).toFixed(0)}%`); sk[2].set(`${(model.acc * 100).toFixed(0)}%`);
-    const k12 = M.dot(pts[0], pts[1]) - pts[0][2] * pts[1][2];
-    sk[3].set((k12 * k12).toFixed(2));
-    const w = model.w, nrm = Math.hypot(w[0], w[1], w[2]) || 1;
-    const f = (v) => (v >= 0 ? '+' : '−') + Math.abs(v / nrm).toFixed(2);
-    const pl = document.querySelector('#k-plane');
-    pl.innerHTML = `分割平面：$${f(w[0])}\\,x_1^2 ${f(w[1])}\\,(\\sqrt2x_1x_2) ${f(w[2])}\\,x_2^2 ${f(w[3])} = 0$`;
-    LAB.renderMath(pl);
-    renderTable(); k2.redraw(); k3.redraw();
-  }
-  function renderTable() {
-    const A = pts.slice(0, 4), sub = ['₁', '₂', '₃', '₄'];
-    const fx = (v) => (Math.abs(v) < 5e-3 ? '0' : (+v.toFixed(2)).toString());
-    let h = `<thead><tr><th>点</th><th>$\\mathbf x$</th><th>$\\boldsymbol\\phi(\\mathbf x)$</th>${A.map((_, j) => `<th>与 x${sub[j]}</th>`).join('')}</tr></thead><tbody>`;
-    A.forEach((p, i) => {
-      const fp = phi(p);
-      h += `<tr><td><b style="color:${p[2] > 0 ? C.c4 : C.c1}">x${sub[i]}</b> <span class="tag ${p[2] > 0 ? 'coral' : ''}">${p[2] > 0 ? '+1' : '−1'}</span></td><td class="num">(${fx(p[0])}, ${fx(p[1])})</td><td class="num">(${fp.map(fx).join(', ')})</td>`;
-      A.forEach((q) => { const k1 = (p[0] * q[0] + p[1] * q[1]) ** 2, k2v = M.dot(fp, phi(q)); h += `<td class="num" style="background:${LAB.mix('#ffffff', C.c3, Math.min(1, k1 / 6) * 0.35)}"><b>${fx(k1)}</b> <span class="muted small">= ${fx(k2v)}</span></td>`; });
-      h += '</tr>';
-    });
-    const t = document.querySelector('#k-table'); t.innerHTML = h + '</tbody>'; LAB.renderMath(t);
-  }
-  const decision = (x) => model ? model.w[0] * x[0] * x[0] + model.w[1] * Math.SQRT2 * x[0] * x[1] + model.w[2] * x[1] * x[1] + model.w[3] : 0;
-  let v2 = null;
-  const k2 = LAB.canvas('#k-2d', (ctx, w, h) => {
-    const s = Math.min(w, h) / 4.6, cx = w / 2, cy = h / 2;
-    v2 = { s, X: (x) => cx + x * s, Y: (y) => cy - y * s, ix: (px) => (px - cx) / s, iy: (py) => (cy - py) / s };
+    sW1.set(best.w1); sW2.set(best.w2); sB.set(best.bb); upd();
+    const cap = document.querySelector('#l-tcap');
+    cap.innerHTML = `电脑试遍了 $w_1,w_2,b\\in[-3,3]$ 上的 ${(61 ** 3).toLocaleString()} 条直线，最好的也要分错 <b>${best.e}</b> 颗。`;
+    LAB.renderMath(cap);
+  };
+  // ---- 二维桌面
+  const v2 = LAB.canvas('#l-2d', (ctx, w, h) => {
+    const R = ds === 0 ? 1.8 : 2.8, s = Math.min(w, h) / (2 * R), cx = w / 2, cy = h / 2;
+    const X = (x) => cx + x * s, Y = (y) => cy - y * s;
     const cell = 5;
     for (let px = 0; px < w; px += cell) for (let py = 0; py < h; py += cell) {
-      const v = decision([v2.ix(px + cell / 2), v2.iy(py + cell / 2)]);
+      const v = score([(px + cell / 2 - cx) / s, (cy - py - cell / 2) / s]);
       ctx.fillStyle = v > 0 ? '#FBEEF0' : '#EAF1FA'; ctx.fillRect(px, py, cell, cell);
     }
-    ctx.save(); ctx.strokeStyle = 'rgba(92,103,115,.25)'; ctx.lineWidth = 1;
-    for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(v2.X(i), 0); ctx.lineTo(v2.X(i), h); ctx.moveTo(0, v2.Y(i)); ctx.lineTo(w, v2.Y(i)); ctx.stroke(); }
+    ctx.save(); ctx.strokeStyle = 'rgba(92,103,115,.22)'; ctx.lineWidth = 1;
+    for (let i = -Math.floor(R); i <= Math.floor(R); i++) { ctx.beginPath(); ctx.moveTo(X(i), 0); ctx.lineTo(X(i), h); ctx.moveTo(0, Y(i)); ctx.lineTo(w, Y(i)); ctx.stroke(); }
     ctx.strokeStyle = '#9aa5b1'; ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(w, cy); ctx.moveTo(cx, 0); ctx.lineTo(cx, h); ctx.stroke();
     ctx.fillStyle = C.slate; ctx.font = '12px ' + NUMF; ctx.fillText('x₁', w - 18, cy - 6); ctx.fillText('x₂', cx + 6, 14);
+    // 分界线
+    ctx.strokeStyle = C.navy; ctx.lineWidth = 2.2;
+    if (mode === 0) {
+      const a = sW1.get(), b = sW2.get(), c = sB.get();
+      ctx.beginPath();
+      if (Math.abs(b) > 1e-9) { ctx.moveTo(X(-R * 1.5), Y((-c - a * -R * 1.5) / b)); ctx.lineTo(X(R * 1.5), Y((-c - a * R * 1.5) / b)); }
+      else if (Math.abs(a) > 1e-9) { ctx.moveTo(X(-c / a), Y(-R * 1.5)); ctx.lineTo(X(-c / a), Y(R * 1.5)); }
+      ctx.stroke();
+    } else if (ds === 0) {
+      const c = sC.get();
+      if (Math.abs(c) < 1e-9) { ctx.beginPath(); ctx.moveTo(X(-R * 1.5), cy); ctx.lineTo(X(R * 1.5), cy); ctx.moveTo(cx, Y(-R * 1.5)); ctx.lineTo(cx, Y(R * 1.5)); ctx.stroke(); }
+      else [1, -1].forEach((sg) => { ctx.beginPath(); let st = false; for (let i = 1; i <= 400; i++) { const x = sg * (0.01 + R * 1.2 * i / 400), y = c / x; if (Math.abs(y) > R * 1.4) { st = false; continue; } if (!st) { ctx.moveTo(X(x), Y(y)); st = true; } else ctx.lineTo(X(x), Y(y)); } ctx.stroke(); });
+    } else {
+      const c = sC.get(); if (c > 0) { ctx.beginPath(); ctx.arc(cx, cy, Math.sqrt(c) * s, 0, 2 * Math.PI); ctx.stroke(); }
+    }
     ctx.restore();
-    // 决策边界：二次曲线 w0 x1² + √2 w1 x1 x2 + w2 x2² + w3 = 0，按列、按行求根描点
-    if (model) {
-      const [a0, a1, a2, a3] = model.w; ctx.save(); ctx.fillStyle = C.navy;
-      const roots = (A, B, Cc) => { if (Math.abs(A) < 1e-9) return Math.abs(B) < 1e-9 ? [] : [-Cc / B]; const D = B * B - 4 * A * Cc; if (D < 0) return []; const r = Math.sqrt(D); return [(-B + r) / (2 * A), (-B - r) / (2 * A)]; };
-      for (let i = 0; i <= 500; i++) {
-        const t = -2.6 + 5.2 * i / 500;
-        roots(a2, Math.SQRT2 * a1 * t, a0 * t * t + a3).forEach((y) => { ctx.beginPath(); ctx.arc(v2.X(t), v2.Y(y), 1.2, 0, 7); ctx.fill(); });
-        roots(a0, Math.SQRT2 * a1 * t, a2 * t * t + a3).forEach((x) => { ctx.beginPath(); ctx.arc(v2.X(x), v2.Y(t), 1.2, 0, 7); ctx.fill(); });
-      }
-      ctx.restore();
-    }
-    pts.forEach((p, i) => {
-      ctx.save(); ctx.fillStyle = p[2] > 0 ? C.c4 : C.c1; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.6;
-      ctx.beginPath(); ctx.arc(v2.X(p[0]), v2.Y(p[1]), i < 4 ? 8 : 5, 0, 7); ctx.fill(); ctx.stroke();
-      if (i < 4) { ctx.fillStyle = '#fff'; ctx.font = '600 10px ' + NUMF; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(i + 1, v2.X(p[0]), v2.Y(p[1]) + 0.5); }
+    pts().forEach((p, i) => {
+      const ok = (score(p) > 0 ? 1 : -1) === p[2];
+      ctx.save(); ctx.fillStyle = p[2] > 0 ? C.c4 : C.c1; ctx.strokeStyle = ok ? '#fff' : C.ink; ctx.lineWidth = ok ? 1.8 : 2.6;
+      ctx.beginPath(); ctx.arc(X(p[0]), Y(p[1]), 9, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.font = '600 10px ' + NUMF; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(i + 1, X(p[0]), Y(p[1]) + 0.5);
+      if (!ok) { ctx.fillStyle = C.ink; ctx.font = '600 13px ' + FONT; ctx.fillText('✗', X(p[0]) + 14, Y(p[1]) - 12); }
       ctx.restore();
     });
   });
-  pointer(k2.canvas, {
-    down: ([x, y]) => { if (!v2) return false; let best = -1, bd = 16; pts.forEach((p, i) => { const d = Math.hypot(v2.X(p[0]) - x, v2.Y(p[1]) - y); if (d < bd) { bd = d; best = i; } }); if (best < 0) return false; drag2 = best; return true; },
-    move: ([x, y]) => { pts[drag2][0] = M.clamp(v2.ix(x), -2.2, 2.2); pts[drag2][1] = M.clamp(v2.iy(y), -2.2, 2.2); fitK(); },
-    up: () => { drag2 = -1; },
-  });
-  // 三维视图：坐标 (X, Y, Z) = (x1², x2², √2 x1 x2)
-  let v3 = null;
-  const k3 = LAB.canvas('#k-3d', (ctx, w, h) => {
-    const P = pts.map((p) => { const f = phi(p); return [f[0], f[2], f[1]]; });
-    const R = Math.max(1.2, ...P.map((p) => Math.max(p[0], p[1]))), Z = Math.max(1.2, ...P.map((p) => Math.abs(p[2]))) * 1.1;
-    const s = Math.min(w, h) / (Math.max(R * 1.9, Z * 1.6) * 1.35), ctr = [R / 2, R / 2, 0];
-    const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
-    const proj = (q) => { const X = q[0] - ctr[0], Y = q[1] - ctr[1], Z = q[2] - ctr[2]; const x1 = X * cy - Y * sy, y1 = X * sy + Y * cy; return [w / 2 + s * x1, h / 2 - s * (Z * cp + y1 * sp), -Z * sp + y1 * cp]; };
-    v3 = proj;
-    const line = (a, b, col, wd, dash) => { const A = proj(a), B = proj(b); ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = wd || 1; if (dash) ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); ctx.restore(); };
-    // 盒子与坐标轴
-    [[0, 0], [R, 0], [R, R], [0, R]].forEach(([x, y], i, arr) => { const [x2, y2] = arr[(i + 1) % 4]; line([x, y, -Z], [x2, y2, -Z], C.line); line([x, y, Z], [x2, y2, Z], C.line); line([x, y, -Z], [x, y, Z], C.line); });
-    line([0, 0, 0], [R * 1.12, 0, 0], C.slate, 1.4); line([0, 0, 0], [0, R * 1.12, 0], C.slate, 1.4); line([0, 0, -Z], [0, 0, Z * 1.08], C.slate, 1.4);
-    const lab = (q, t) => { const A = proj(q); ctx.save(); ctx.fillStyle = C.slate; ctx.font = '12px ' + NUMF; ctx.textAlign = 'center'; ctx.fillText(t, A[0], A[1]); ctx.restore(); };
-    lab([R * 1.25, 0, 0], 'x₁²'); lab([0, R * 1.25, 0], 'x₂²'); lab([0, 0, Z * 1.2], '√2·x₁x₂');
-    // 分割平面 wᵀφ + b = 0：在 (X, Y, Z) 中系数为 (w0, w2, w1)
-    let quad = null;
-    if (model) {
-      const [a0, a1, a2, a3] = model.w, cX = a0, cY = a2, cZ = a1, ab = [Math.abs(cX), Math.abs(cY), Math.abs(cZ) * 1.0];
-      const big = ab.indexOf(Math.max(...ab));
-      const g = (u, v) => (big === 2 ? [u, v, -(cX * u + cY * v + a3) / cZ] : big === 0 ? [-(cY * u + cZ * v + a3) / cX, u, v] : [u, -(cX * u + cZ * v + a3) / cY, v]);
-      const ur = big === 2 ? [0, R] : [0, R], vr = big === 2 ? [0, R] : [-Z, Z];
-      quad = { g, ur, vr };
-    }
-    const depth0 = proj([R / 2, R / 2, 0])[2];
-    const order = P.map((p, i) => ({ p, i, d: proj(p)[2] })).sort((a, b) => b.d - a.d);
-    const drawPt = (o) => { const A = proj(o.p); ctx.save(); ctx.fillStyle = pts[o.i][2] > 0 ? C.c4 : C.c1; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.4; ctx.globalAlpha = 0.95; ctx.beginPath(); ctx.arc(A[0], A[1], o.i < 4 ? 7 : 4.5, 0, 7); ctx.fill(); ctx.stroke(); if (o.i < 4) { ctx.fillStyle = '#fff'; ctx.font = '600 9.5px ' + NUMF; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(o.i + 1, A[0], A[1] + 0.5); } ctx.restore(); };
-    order.filter((o) => o.d > depth0).forEach(drawPt);
-    if (quad) {
-      const { g, ur, vr } = quad, n = 6;
-      const c4 = [g(ur[0], vr[0]), g(ur[1], vr[0]), g(ur[1], vr[1]), g(ur[0], vr[1])].map(proj);
-      ctx.save(); ctx.fillStyle = 'rgba(107,76,154,.16)'; ctx.strokeStyle = 'rgba(107,76,154,.7)'; ctx.lineWidth = 1.2;
-      ctx.beginPath(); c4.forEach((q, i) => (i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]))); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
-      for (let i = 1; i < n; i++) { const u = ur[0] + (ur[1] - ur[0]) * i / n, v = vr[0] + (vr[1] - vr[0]) * i / n; line(g(u, vr[0]), g(u, vr[1]), 'rgba(107,76,154,.25)'); line(g(ur[0], v), g(ur[1], v), 'rgba(107,76,154,.25)'); }
-    }
-    order.filter((o) => o.d <= depth0).forEach(drawPt);
-  });
-  pointer(k3.canvas, {
-    down: ([x, y]) => { drag3 = { x, y, yaw, pitch }; return true; },
-    move: ([x, y]) => { yaw = drag3.yaw - (x - drag3.x) * 0.01; pitch = M.clamp(drag3.pitch + (y - drag3.y) * 0.01, -1.4, 1.4); k3.redraw(); },
-    up: () => { drag3 = null; },
-  });
-  k3.canvas.style.touchAction = 'pan-y'; // 手机上竖向滑动仍可滚动页面，横向拖动旋转
-  function spinLoop() {
-    if (!spinOn || !isActive(sec1)) { spinning = false; return; }
-    if (!drag3) { yaw += 0.005; k3.redraw(); }
-    requestAnimationFrame(spinLoop);
+  // ---- 三维视图
+  function proj(w, h) {
+    const R = ds === 0 ? 1.5 : 2.4, zs = ds === 0 ? 0.9 : 0.38, s = Math.min(w, h) / (2.6 * R);
+    const ca = Math.cos(yaw), sa = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+    return (x, y, z) => { const xr = x * ca - y * sa, yr = x * sa + y * ca; return [w / 2 + xr * s, h * 0.55 - (z * zs * cp - yr * sp) * s * 0.95 - 0 , yr * cp + z * sp]; };
   }
-  function ensureSpin() { if (spinOn && !spinning && isActive(sec1)) { spinning = true; requestAnimationFrame(spinLoop); } }
-  window.addEventListener('resize', ensureSpin);
-  document.addEventListener('visibilitychange', ensureSpin);
-  build(); ensureSpin();
-
-  /* ================= 实验 2：核回归与随机傅里叶特征 ================= */
-  const XR = [-3, 3], YR = [-2.3, 2.3], DLIST = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096], DMAX = 4096;
-  let data = [], rffSeed = 1, showRff = true, Om = null, Bp = null, dragF = -1, errCurve = [];
-  const sSig = LAB.slider('#f-sigma', { label: '带宽 $\\sigma$', min: 0.1, max: 3, step: 0.05, value: 0.7, fmt: (v) => v.toFixed(2), onInput: () => { upd(); runErr(); } });
-  const sLam = LAB.slider('#f-lambda', { label: '正则 $\\lambda$', min: -4, max: 1, step: 0.1, value: -2, fmt: (v) => LAB.tex(`10^{${v.toFixed(1)}}`), onInput: () => upd() });
-  const sD = LAB.slider('#f-D', { label: '随机特征数 $D$', min: 0, max: DLIST.length - 1, step: 1, value: 6, fmt: (i) => DLIST[i], onInput: () => upd() });
-  LAB.checkbox('#f-showrff', '显示随机特征回归曲线', true, (v) => { showRff = v; reg.redraw(); });
-  document.querySelector('#f-redraw').onclick = () => { rffSeed++; drawRff(); upd(); };
-  document.querySelector('#f-data').onclick = () => { randomData(Math.floor(Math.random() * 1e6)); upd(); };
-  function drawRff() { const R = LAB.rng(rffSeed * 7 + 1); Om = Float64Array.from({ length: DMAX }, () => R.normal()); Bp = Float64Array.from({ length: DMAX }, () => R() * 2 * Math.PI); }
-  function randomData(seed) {
-    const R = LAB.rng(seed), n = 9;
-    data = M.range(n).map((i) => { const x = -2.7 + 5.4 * (i + 0.5 * R()) / n; return [x, Math.sin(1.3 * x) + 0.4 * Math.cos(2.7 * x) + 0.15 * R.normal()]; });
+  const v3 = LAB.canvas('#l-3d', (ctx, w, h) => {
+    const P = proj(w, h), R = ds === 0 ? 1.5 : 2.4;
+    const seg = (a, b, col, lw, dash) => { ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = lw || 1; if (dash) ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.restore(); };
+    const poly = (ps, fill, stroke) => { ctx.save(); ctx.beginPath(); ps.forEach((q, i) => (i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]))); ctx.closePath(); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); } ctx.restore(); };
+    // 桌面（高度 0）
+    const base = ds === 0 ? 0 : 0;
+    poly([P(-R, -R, base), P(R, -R, base), P(R, R, base), P(-R, R, base)], 'rgba(176,122,78,.10)', 'rgba(138,90,54,.35)');
+    // 坐标轴
+    seg(P(-R, 0, base), P(R, 0, base), '#9aa5b1', 1); seg(P(0, -R, base), P(0, R, base), '#9aa5b1', 1);
+    ctx.save(); ctx.fillStyle = C.slate; ctx.font = '12px ' + NUMF; const ax = P(R * 1.08, 0, base), ay = P(0, R * 1.08, base); ctx.fillText('x₁', ax[0], ax[1]); ctx.fillText('x₂', ay[0], ay[1]); ctx.restore();
+    if (mode === 1) {
+      // 床单曲面网格
+      const N = 12;
+      for (let i = 0; i <= N; i++) {
+        const a = [], b = [];
+        for (let j = 0; j <= 40; j++) {
+          if (ds === 0) { const u = -R + 2 * R * i / N, v = -R + 2 * R * j / 40; a.push(P(u, v, u * v)); b.push(P(v, u, u * v)); }
+          else { const r = 2.3 * i / N, t = 2 * Math.PI * j / 40; a.push(P(r * Math.cos(t), r * Math.sin(t), r * r)); const rr = 2.3 * j / 40, tt = 2 * Math.PI * i / N; b.push(P(rr * Math.cos(tt), rr * Math.sin(tt), rr * rr)); }
+        }
+        [a, b].forEach((L) => { ctx.save(); ctx.strokeStyle = 'rgba(107,76,154,.28)'; ctx.lineWidth = 1; ctx.beginPath(); L.forEach((q, k) => (k ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]))); ctx.stroke(); ctx.restore(); });
+      }
+      // 水平刀面
+      const c = sC.get(), Q = R * 1.05;
+      poly([P(-Q, -Q, c), P(Q, -Q, c), P(Q, Q, c), P(-Q, Q, c)], 'rgba(224,154,45,.22)', 'rgba(224,154,45,.8)');
+      const lab = P(Q, -Q, c); ctx.save(); ctx.fillStyle = C.amber; ctx.font = '600 12px ' + FONT; ctx.fillText(`刀面 x₃ = ${c.toFixed(2)}`, lab[0] + 4, lab[1]); ctx.restore();
+    } else {
+      // 竖直刀面 w1x1+w2x2+b=0
+      const a = sW1.get(), b = sW2.get(), cc = sB.get(), H = 1.2;
+      // 直线 a x + b y + cc = 0 与正方形 [-R,R]^2 的交点
+      const hits = [];
+      if (Math.abs(b) > 1e-9) [-R, R].forEach((x) => { const y = (-cc - a * x) / b; if (Math.abs(y) <= R + 1e-9) hits.push([x, y]); });
+      if (Math.abs(a) > 1e-9) [-R, R].forEach((y) => { const x = (-cc - b * y) / a; if (Math.abs(x) <= R + 1e-9) hits.push([x, y]); });
+      const p1 = hits[0], p2 = hits.find((q) => Math.hypot(q[0] - hits[0][0], q[1] - hits[0][1]) > 1e-6);
+      if (p1 && p2) poly([P(p1[0], p1[1], -H), P(p2[0], p2[1], -H), P(p2[0], p2[1], H), P(p1[0], p1[1], H)], 'rgba(29,53,87,.12)', 'rgba(29,53,87,.55)');
+    }
+    // 豆子（按深度排序）
+    const items = pts().map((p, i) => { const z = mode === 1 ? lift(p) : 0; return { p, i, z, q: P(p[0], p[1], z), q0: P(p[0], p[1], base) }; }).sort((u, v) => v.q[2] - u.q[2]);
+    items.forEach(({ p, i, z, q, q0 }) => {
+      if (mode === 1) seg(q0, q, 'rgba(92,103,115,.6)', 1, [3, 3]);
+      const ok = (score(p) > 0 ? 1 : -1) === p[2];
+      ctx.save(); ctx.fillStyle = p[2] > 0 ? C.c4 : C.c1; ctx.strokeStyle = ok ? '#fff' : C.ink; ctx.lineWidth = ok ? 1.6 : 2.4;
+      ctx.beginPath(); ctx.arc(q[0], q[1], 8, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.font = '600 10px ' + NUMF; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(i + 1, q[0], q[1] + 0.5);
+      if (mode === 1) { ctx.fillStyle = C.ink; ctx.font = '11px ' + NUMF; ctx.textAlign = 'left'; ctx.fillText(`x₃=${r4(z)}`, q[0] + 11, q[1] - 8); }
+      ctx.restore();
+    });
+  });
+  pointer(v3.canvas, {
+    down: (p) => { dragging = { p, yaw, pitch }; return true; },
+    move: (p) => { yaw = dragging.yaw + (p[0] - dragging.p[0]) * 0.01; pitch = M.clamp(dragging.pitch + (p[1] - dragging.p[1]) * 0.01, -0.2, 1.35); v3.redraw(); },
+    up: () => { dragging = null; },
+  });
+  let spinning = false;
+  function ensureSpin() {
+    if (spinning || !spin) return; spinning = true;
+    let last = performance.now();
+    const loop = (t) => {
+      if (!spin) { spinning = false; return; }
+      if (sec1.classList.contains('active') && !dragging) { yaw += (t - last) * 0.00025; v3.redraw(); }
+      last = t; requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
   }
-  drawRff(); randomData(4);
-  const kf = (a, b, s) => Math.exp(-(a - b) * (a - b) / (2 * s * s));
-  function zfeat(x, D, s) { const z = new Float64Array(D), c = Math.sqrt(2 / D); for (let j = 0; j < D; j++) z[j] = c * Math.cos(Om[j] / s * x + Bp[j]); return z; }
-  let fitE = null, fitR = null;
-  const GX = M.linspace(XR[0], XR[1], 241);
-  const sf = [LAB.stat('#f-stats', '数据点 $N$'), LAB.stat('#f-stats', '有效自由度 $\\operatorname{tr}\\,\\mathbf K(\\mathbf K+\\lambda\\mathbf I)^{-1}$', 'teal'), LAB.stat('#f-stats', '训练均方根误差', 'coral'), LAB.stat('#f-stats', '两条曲线最大差', 'amber')];
+  const stL = [LAB.stat('#l-stats', '分错的豆子', 'coral'), LAB.stat('#l-stats', '红豆的得分之和', ''), LAB.stat('#l-stats', '蓝豆的得分之和', 'plum')];
   function upd() {
-    const s = sSig.get(), lam = Math.pow(10, sLam.get()), D = DLIST[sD.get()], N = data.length;
-    const K = data.map((p) => data.map((q) => kf(p[0], q[0], s)));
-    const A = K.map((r, i) => r.map((v, j) => v + (i === j ? lam : 0)));
-    const alpha = solve(A, data.map((p) => p[1]));
-    const f = GX.map((x) => data.reduce((acc, p, i) => acc + alpha[i] * kf(x, p[0], s), 0));
-    let dof = 0; for (let j = 0; j < N; j++) { const e = M.range(N).map((i) => (i === j ? 1 : 0)); const col = solve(A, e); dof += 1 - lam * col[j]; }
-    const fitted = data.map((p) => data.reduce((acc, q, i) => acc + alpha[i] * kf(p[0], q[0], s), 0));
-    const rmse = Math.sqrt(M.mean(fitted.map((v, i) => (v - data[i][1]) ** 2)));
-    // 随机特征：K̂ = Z Zᵀ；预测 f̂(x) = z(x)ᵀ Zᵀ (K̂+λI)⁻¹ y
-    const Z = data.map((p) => zfeat(p[0], D, s));
-    const Kh = Z.map((a) => Z.map((b) => M.dot(a, b)));
-    const ah = solve(Kh.map((r, i) => r.map((v, j) => v + (i === j ? lam : 0))), data.map((p) => p[1]));
-    const wv = new Float64Array(D); Z.forEach((z, i) => { for (let j = 0; j < D; j++) wv[j] += z[j] * ah[i]; });
-    const fh = GX.map((x) => M.dot(zfeat(x, D, s), wv));
-    fitE = { f, alpha, s }; fitR = { f: fh };
-    sf[0].set(N); sf[1].set(dof.toFixed(2)); sf[2].set(rmse.toFixed(3));
-    sf[3].set(M.fmt(Math.max(...f.map((v, i) => Math.abs(v - fh[i]))), 3) + `<small>D = ${D}</small>`);
-    reg.redraw(); heat.redraw(); errc.redraw();
-  }
-  let PR = null;
-  const reg = LAB.canvas('#f-reg', (ctx, w, h) => {
-    const P = new LAB.Plot(ctx, w, h, { xmin: XR[0], xmax: XR[1], ymin: YR[0], ymax: YR[1], xlabel: 'x', ylabel: 'y', pad: { l: 40, r: 12, t: 10, b: 36 } }).axes();
-    PR = P; if (!fitE) return;
-    P.clip();
-    data.forEach((p, i) => P.fn((x) => fitE.alpha[i] * kf(x, p[0], fitE.s), '#C9D1DA', 1.1, null, 200));
-    if (showRff) P.line(GX, fitR.f, C.c2, 2.2, [7, 4]);
-    P.line(GX, fitE.f, C.c1, 2.6);
-    P.unclip();
-    data.forEach((p, i) => P.points([p[0]], [p[1]], i === dragF ? C.c4 : C.navy, i === dragF ? 7 : 5.5, '#fff'));
-  });
-  pointer(reg.canvas, {
-    down: ([x, y]) => {
-      if (!PR) return false;
-      let best = -1, bd = 16; data.forEach((p, i) => { const d = Math.hypot(PR.tx(p[0]) - x, PR.ty(p[1]) - y); if (d < bd) { bd = d; best = i; } });
-      if (best < 0) { if (x < PR.x0 || x > PR.x1 || y < PR.y1 || y > PR.y0) return false; data.push([PR.ix(x), PR.iy(y)]); best = data.length - 1; }
-      dragF = best; upd(); return true;
-    },
-    move: ([x, y]) => { data[dragF] = [PR.ix(x), PR.iy(y)]; if (data[dragF][0] >= XR[0] && data[dragF][0] <= XR[1] && data[dragF][1] >= YR[0] && data[dragF][1] <= YR[1]) upd(); else reg.redraw(); },
-    up: () => {
-      const p = data[dragF];
-      if ((p[0] < XR[0] || p[0] > XR[1] || p[1] < YR[0] || p[1] > YR[1]) && data.length > 1) data.splice(dragF, 1);
-      else { p[0] = M.clamp(p[0], XR[0], XR[1]); p[1] = M.clamp(p[1], YR[0], YR[1]); }
-      dragF = -1; upd();
-    },
-  });
-  const HG = M.linspace(-3, 3, 24);
-  function gramRff(D, s, om, bp) {
-    const Z = HG.map((x) => { const z = new Float64Array(D), c = Math.sqrt(2 / D); for (let j = 0; j < D; j++) z[j] = c * Math.cos(om[j] / s * x + bp[j]); return z; });
-    return Z.map((a) => Z.map((b) => M.dot(a, b)));
-  }
-  const heat = LAB.canvas('#f-heat', (ctx, w, h) => {
-    const s = sSig.get(), D = DLIST[sD.get()];
-    const Ke = HG.map((a) => HG.map((b) => kf(a, b, s))), Kr = gramRff(D, s, Om, Bp);
-    const gap = 18, size = Math.min((w - gap) / 2, h - 30), cs = size / 24, x0 = (w - 2 * size - gap) / 2;
-    [[Ke, '精确 K'], [Kr, `随机特征 D = ${D}`]].forEach(([K, t], k) => {
-      const ox = x0 + k * (size + gap);
-      for (let i = 0; i < 24; i++) for (let j = 0; j < 24; j++) { ctx.fillStyle = LAB.diverge(K[i][j]); ctx.fillRect(ox + j * cs, 4 + i * cs, cs + 0.5, cs + 0.5); }
-      ctx.strokeStyle = C.line; ctx.strokeRect(ox, 4, size, size);
-      ctx.fillStyle = C.ink; ctx.font = '12px ' + FONT; ctx.textAlign = 'center'; ctx.fillText(t, ox + size / 2, 4 + size + 15);
+    const P = pts(), names = ds === 0 ? NAMES.xor : NAMES.ring;
+    const e = wrong();
+    stL[0].set(`${e}<small>/ ${P.length} 颗</small>`);
+    const red = P.filter((p) => p[2] > 0).reduce((s, p) => s + score(p), 0), blue = P.filter((p) => p[2] < 0).reduce((s, p) => s + score(p), 0);
+    stL[1].set(`${r2(red)}<small>要求 &gt; 0</small>`);
+    stL[2].set(`${r2(blue)}<small>要求 &lt; 0</small>`);
+    const cap2 = document.querySelector('#l-cap2'), cap3 = document.querySelector('#l-cap3');
+    if (mode === 0) {
+      cap2.innerHTML = ds === 0 ? `直线 $${tm(sW1.get())}x_1${sW2.get() >= 0 ? '+' : ''}${tm(sW2.get())}x_2${sB.get() >= 0 ? '+' : ''}${tm(sB.get())}=0$。两颗红豆的得分相加等于 $2b$，两颗蓝豆相加也等于 $2b$，不可能一正一负。` : `圆环上同样有：内圈 4 颗的得分之和是 $4b$，外圈 4 颗也是 $4b$。`;
+      cap3.innerHTML = '豆子都躺在桌面上（高度 0），竖直的刀面就是左图那条直线。';
+    } else {
+      cap2.innerHTML = ds === 0 ? `把三维里的水平一刀投影回桌面：$x_1x_2=${tm(sC.get())}$，是一条会拐弯的曲线（$c=0$ 时就是两条坐标轴）。` : `投影回桌面：圆 $x_1^2+x_2^2=${tm(sC.get())}$，半径 $\\sqrt{${tm(sC.get())}}\\approx${tm(Math.sqrt(Math.max(sC.get(), 0)))}$。`;
+      cap3.innerHTML = ds === 0 ? '红豆升到 $x_3=+1$，蓝豆沉到 $x_3=-1$。' : '内圈升到 $x_3=1$，外圈升到 $x_3=4$。';
+    }
+    LAB.renderMath(cap2); LAB.renderMath(cap3);
+    let hh = `<thead><tr><th>豆子</th><th>$(x_1,x_2)$</th><th>标签</th>${mode === 1 ? `<th>高度 $x_3=${ds === 0 ? 'x_1x_2' : 'x_1^2+x_2^2'}$</th>` : ''}<th>得分 ${mode === 0 ? '$w_1x_1+w_2x_2+b$' : (ds === 0 ? '$x_3-c$' : '$c-x_3$')}</th><th>判对了吗</th></tr></thead><tbody>`;
+    P.forEach((p, i) => {
+      const sc = score(p), ok = (sc > 0 ? 1 : -1) === p[2];
+      hh += `<tr><td><b style="color:${p[2] > 0 ? C.c4 : C.c1}">${i + 1}. ${names[i]}</b></td><td class="num">(${r4(p[0])}, ${r4(p[1])})</td><td><span class="tag ${p[2] > 0 ? 'coral' : ''}">${p[2] > 0 ? '+1 红' : '−1 蓝'}</span></td>${mode === 1 ? `<td class="num">${r4(lift(p))}</td>` : ''}<td class="num">${r2(sc)}</td><td>${ok ? '✓' : '<b style="color:var(--coral)">✗</b>'}</td></tr>`;
     });
-  });
-  const runErr = schedule(() => {
-    const s = sSig.get(), Ke = HG.map((a) => HG.map((b) => kf(a, b, s))), nK = Math.sqrt(Ke.flat().reduce((a, v) => a + v * v, 0));
-    errCurve = DLIST.map((D) => {
-      let e = 0;
-      for (let r = 0; r < 6; r++) { const R = LAB.rng(1000 + r * 31 + D), om = Float64Array.from({ length: D }, () => R.normal()), bp = Float64Array.from({ length: D }, () => R() * 2 * Math.PI); const Kr = gramRff(D, s, om, bp); let d = 0; for (let i = 0; i < 24; i++) for (let j = 0; j < 24; j++) d += (Kr[i][j] - Ke[i][j]) ** 2; e += Math.sqrt(d) / nK; }
-      return e / 6;
-    });
-    errc.redraw();
-  });
-  const errc = LAB.canvas('#f-err', (ctx, w, h) => {
-    if (!errCurve.length) return;
-    const P = new LAB.Plot(ctx, w, h, { xmin: 1, xmax: 4096, logx: true, logy: true, ymin: 0.005, ymax: 3, xtickValues: [1, 8, 64, 512, 4096], xfmt: (v) => v, ytickValues: [0.01, 0.1, 1], xlabel: '特征数 D', ylabel: '相对误差', pad: { l: 48, r: 12, t: 10, b: 38 } }).axes();
-    P.clip();
-    P.fn((D) => errCurve[0] / Math.sqrt(D), C.slate, 1.4, [6, 4]);
-    P.line(DLIST, errCurve, C.c2, 2.2); P.points(DLIST, errCurve, C.c2, 3);
-    P.unclip();
-    const s = sSig.get(), D = DLIST[sD.get()], Ke = HG.map((a) => HG.map((b) => kf(a, b, s))), Kr = gramRff(D, s, Om, Bp);
-    let d = 0, n = 0; for (let i = 0; i < 24; i++) for (let j = 0; j < 24; j++) { d += (Kr[i][j] - Ke[i][j]) ** 2; n += Ke[i][j] ** 2; }
-    P.points([D], [Math.max(Math.sqrt(d / n), 0.006)], C.c4, 6, '#fff');
-  });
-  upd(); runErr();
+    const tb = document.querySelector('#l-table'); tb.innerHTML = hh + '</tbody>'; LAB.renderMath(tb);
+    const cap = document.querySelector('#l-tcap');
+    cap.innerHTML = mode === 0 ? '红豆要求得分 $&gt;0$，蓝豆要求 $&lt;0$。在桌面上，这两个要求永远不能同时满足。' : (ds === 0 ? '书中取 $c=0$：$F=x_3$，红豆 $+1&gt;0$，蓝豆 $-1&lt;0$，一刀切开。' : '练习 4.1 取 $c=2.5$：内圈 $F=-1+2.5=+1.5&gt;0$，外圈 $F=-4+2.5=-1.5&lt;0$。');
+    LAB.renderMath(cap);
+    v2.redraw(); v3.redraw();
+  }
+  upd(); ensureSpin();
 
-  /* ================= 实验 3：NTK 与频谱偏置 ================= */
-  const sec3 = document.querySelector('#ntk');
-  const NT = 40, TMAX = 5000, XT = M.linspace(-1, 1, NT), GXN = M.linspace(-1, 1, 161);
-  const MLIST = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096], ALIST = [0.1, 1];
-  let net = null, running = false, runs = [], ampIdx = 0;
-  const sM = LAB.slider('#n-M', { label: '隐藏层宽度 $M$', min: 0, max: MLIST.length - 1, step: 1, value: 6, fmt: (i) => MLIST[i], onInput: () => resetNet() });
-  const sK = LAB.slider('#n-k', { label: '高频成分 $\\sin k\\pi x$ 的 $k$', min: 2, max: 6, step: 1, value: 4, onInput: () => resetNet() });
-  LAB.segmented('#n-A', ['$A=0.1$（惰性区）', '$A=1$（特征学习区）'], 0, (i) => { ampIdx = i; resetNet(); });
-  const runBtn = document.querySelector('#n-run');
-  runBtn.onclick = () => { if (running) { running = false; runBtn.textContent = '▶ 继续训练'; return; } if (net.step >= TMAX) resetNet(); running = true; runBtn.textContent = '⏸ 暂停'; requestAnimationFrame(trainLoop); };
-  document.querySelector('#n-reset').onclick = () => resetNet();
-  function ntkMatrix(n, xsA, xsB) { // Θ(x,x') = (1/M) Σ [σσ' + a² 1[·>0]1[·>0] (xx'+1)]
-    const { a, w, b, M: Mw } = n, T = new Float64Array(xsA.length * xsB.length);
-    for (let m = 0; m < Mw; m++) {
-      const am2 = a[m] * a[m], wm = w[m], bm = b[m];
-      for (let i = 0; i < xsA.length; i++) { const p = wm * xsA[i] + bm; if (p <= 0) continue; for (let j = 0; j < xsB.length; j++) { const q = wm * xsB[j] + bm; if (q > 0) T[i * xsB.length + j] += p * q + am2 * (xsA[i] * xsB[j] + 1); } }
-    }
-    for (let i = 0; i < T.length; i++) T[i] /= Mw;
-    return T;
+  /* ================= 实验 2：先点积再平方 ================= */
+  const BOOKX = [2, 3], BOOKZ = [4, 1];
+  const kx = ['x_1', 'x_2', 'z_1', 'z_2'].map((nm, i) => LAB.slider('#k-' + nm.replace('_', ''), { label: `$${nm}$`, min: -5, max: 5, step: 0.5, value: [2, 3, 4, 1][i], fmt: (v) => v.toFixed(1), onInput: () => updK() }));
+  const DS = [2, 10, 100, 1000, 10000];
+  const sD = LAB.slider('#k-d', { label: '原始维度 $d$（算力对比用）', min: 0, max: DS.length - 1, step: 1, value: 3, fmt: (i) => DS[i].toLocaleString(), onInput: () => updK() });
+  document.querySelector('#k-reset').onclick = () => { [2, 3, 4, 1].forEach((v, i) => kx[i].set(v)); updK(); };
+  const rt2 = (v) => { // 把 a·√2 写成好看的形式
+    if (Math.abs(v) < 1e-12) return '0';
+    const s = Math.abs(v) === 1 ? '' : String(+Math.abs(v).toFixed(4));
+    return (v < 0 ? '-' : '') + s + '\\sqrt{2}';
+  };
+  const stK = [LAB.stat('#k-stats', '笨办法：三维内积', 'amber'), LAB.stat('#k-stats', '聪明办法：$(\\mathbf x^\\top\\mathbf z)^2$', 'teal'), LAB.stat('#k-stats', '两者之差', 'leaf')];
+  function updK() {
+    const [x1, x2, z1, z2] = kx.map((s) => s.get());
+    const fx = [x1 * x1, x1 * x2, x2 * x2], fz = [z1 * z1, z1 * z2, z2 * z2]; // 第 2 个分量还要乘 √2
+    const prod = [fx[0] * fz[0], 2 * fx[1] * fz[1], fx[2] * fz[2]];
+    const total = prod[0] + prod[1] + prod[2], dot = x1 * z1 + x2 * z2, smart = dot * dot;
+    const n = (v) => String(+v.toFixed(4));
+    let hh = '<thead><tr><th>分量</th><th>$\\phi(\\mathbf x)$</th><th>$\\phi(\\mathbf z)$</th><th>相乘</th></tr></thead><tbody>';
+    hh += `<tr><td>$x_1^2\\cdot z_1^2$</td><td class="num">$${n(fx[0])}$</td><td class="num">$${n(fz[0])}$</td><td class="num"><b>${n(prod[0])}</b></td></tr>`;
+    hh += `<tr><td>$\\sqrt2x_1x_2\\cdot\\sqrt2z_1z_2$</td><td class="num">$${rt2(fx[1])}$</td><td class="num">$${rt2(fz[1])}$</td><td class="num"><b>${n(prod[1])}</b></td></tr>`;
+    hh += `<tr><td>$x_2^2\\cdot z_2^2$</td><td class="num">$${n(fx[2])}$</td><td class="num">$${n(fz[2])}$</td><td class="num"><b>${n(prod[2])}</b></td></tr>`;
+    hh += `<tr><td colspan="3"><b>三项相加</b></td><td class="num"><b style="color:var(--amber)">${n(total)}</b></td></tr></tbody>`;
+    const tb = document.querySelector('#k-table'); tb.innerHTML = hh; LAB.renderMath(tb);
+    const sm = document.querySelector('#k-smart');
+    sm.innerHTML = `$$\\mathbf x^\\top\\mathbf z=${n(x1)}\\times${n(z1)}+${n(x2)}\\times${n(z2)}=${n(dot)},\\qquad (\\mathbf x^\\top\\mathbf z)^2=${n(dot)}^2=${n(smart)}$$`.replace(/\+-/g, '-').replace(/\\times-([\d.]+)/g, '\\times(-$1)');
+    LAB.renderMath(sm);
+    const d = DS[sD.get()];
+    const cost = document.querySelector('#k-cost');
+    cost.innerHTML = `$d=${d.toLocaleString().replace(/,/g, '{,}')}$ 时：笨办法要先算 $d^2=${(d * d).toLocaleString().replace(/,/g, '{,}')}$ 个二次乘积（去掉重复也有 $\\tfrac{d(d+1)}{2}=${(d * (d + 1) / 2).toLocaleString().replace(/,/g, '{,}')}$ 个）；聪明办法只做 $${d.toLocaleString().replace(/,/g, '{,}')}$ 次乘法，再平方一次。`;
+    LAB.renderMath(cost);
+    stK[0].set(n(total)); stK[1].set(n(smart)); stK[2].set(Math.abs(total - smart) < 1e-9 ? '0<small>分毫不差</small>' : M.fmt(total - smart, 3));
   }
-  function resetNet() {
-    running = false; runBtn.textContent = '▶ 开始训练';
-    const Mw = MLIST[sM.get()], k = sK.get(), R = LAB.rng(20 + Mw);
-    const a = new Float64Array(Mw), w = new Float64Array(Mw), b = new Float64Array(Mw);
-    for (let m = 0; m < Mw / 2; m++) { a[m] = R.normal(); w[m] = R.normal(); b[m] = R.normal(); a[m + Mw / 2] = -a[m]; w[m + Mw / 2] = w[m]; b[m + Mw / 2] = b[m]; }
-    const A = ALIST[ampIdx], y = XT.map((x) => A * (Math.sin(Math.PI * x) + Math.sin(k * Math.PI * x)));
-    const n = { M: Mw, k, A, a, w, b, y, step: 0, f: new Float64Array(NT), pre: new Float64Array(Mw * NT) };
-    n.T0 = ntkMatrix(n, XT, XT);
-    n.E = eigSym(n.T0, NT);
-    n.eta = 0.9 / n.E.vals[0];
-    n.Tg = ntkMatrix(n, GXN, XT);
-    const lo = XT.map((x) => Math.sin(Math.PI * x)), hi = XT.map((x) => Math.sin(k * Math.PI * x));
-    n.ulo = lo.map((v) => v / M.norm(lo)); n.uhi = hi.map((v) => v / M.norm(hi));
-    n.r0lo = -M.dot(y, n.ulo); n.r0hi = -M.dot(y, n.uhi);
-    n.proj = n.E.vecs.map((v) => ({ vy: M.dot(v, y), vlo: M.dot(v, n.ulo), vhi: M.dot(v, n.uhi) }));
-    n.hist = [{ t: 0, lo: 1, hi: 1 }]; n.nextLog = 1;
-    n.drift = [{ t: 0, d: 0 }]; n.nextDrift = 1; n.nT0 = Math.sqrt(n.T0.reduce((s, v) => s + v * v, 0));
-    net = n;
-    // 理论曲线：残差 r(t) = −Σ_k (1−ηλ_k)^t ⟨v_k,y⟩ v_k
-    n.theory = []; for (let i = 0; i <= 160; i++) { const t = Math.pow(TMAX, i / 160); n.theory.push({ t, ...theoryRes(t) }); }
-    n.t10 = { lo: firstBelow('lo'), hi: firstBelow('hi') };
-    document.querySelector('#n-eta').innerHTML = `学习率 $\\eta=0.9/\\lambda_{\\max}=${n.eta.toFixed(4)}$，最多训练 ${TMAX.toLocaleString()} 步。`;
-    LAB.renderMath(document.querySelector('#n-eta'));
-    updN(); fit.redraw(); spec.redraw(); vecs.redraw(); res.redraw(); drift.redraw();
+  updK();
+  // ---- 第二部分：指数核的泰勒展开
+  const fact = (k) => { let f = 1; for (let i = 2; i <= k; i++) f *= i; return f; };
+  const sU = LAB.slider('#e-u', { label: '内积 $u=\\mathbf q^\\top\\mathbf k$', min: -3, max: 3, step: 0.1, value: 1, fmt: (v) => v.toFixed(1), onInput: () => updE() });
+  const sN = LAB.slider('#e-n', { label: '保留到第 $n$ 阶', min: 0, max: 10, step: 1, value: 2, onInput: () => updE() });
+  const partial = (u, n) => { let s = 0; for (let k = 0; k <= n; k++) s += Math.pow(u, k) / fact(k); return s; };
+  const eb = LAB.canvas('#e-bars', (ctx, w, h) => {
+    const u = sU.get(), n = sN.get(), terms = M.range(11).map((k) => Math.pow(u, k) / fact(k));
+    const lo = Math.min(-0.2, ...terms) * 1.15, hi = Math.max(1.1, ...terms) * 1.15;
+    const P = new LAB.Plot(ctx, w, h, { xmin: -0.6, xmax: 10.6, ymin: lo, ymax: hi, xtickValues: M.range(11), xfmt: (v) => v, xlabel: '阶数 n', ylabel: 'uⁿ / n!', pad: { l: 46, r: 10, t: 10, b: 38 } }).axes();
+    P.hline(0, '#9aa5b1');
+    const bw = (P.tx(1) - P.tx(0)) * 0.6;
+    P.bars(M.range(11), terms, M.range(11).map((k) => (k <= n ? C.c1 : LAB.mix(C.c1, '#ffffff', 0.7))), bw, 0);
+  });
+  const ec = LAB.canvas('#e-curve', (ctx, w, h) => {
+    const u = sU.get(), n = sN.get();
+    const P = new LAB.Plot(ctx, w, h, { xmin: -3, xmax: 3, ymin: -3, ymax: 21, xlabel: 'u', pad: { l: 40, r: 10, t: 10, b: 36 } }).axes();
+    P.clip(); P.fn(Math.exp, '#B8C1CC', 5); P.fn((v) => partial(v, n), C.c4, 2.2); P.unclip();
+    P.vline(u, C.slate, [4, 3]);
+    P.points([u], [Math.exp(u)], C.slate, 4.5, '#fff'); P.points([u], [partial(u, n)], C.c4, 4.5, '#fff');
+  });
+  const stE = [LAB.stat('#e-stats', '真实值 $e^{u}$'), LAB.stat('#e-stats', '前 $n$ 阶之和', 'coral'), LAB.stat('#e-stats', '相对误差', 'amber')];
+  function updE() {
+    const u = sU.get(), n = sN.get(), e = Math.exp(u), s = partial(u, n);
+    stE[0].set(r4(e)); stE[1].set(`${r4(s)}<small>${n + 1} 项</small>`); stE[2].set(`${(Math.abs(s - e) / e * 100).toFixed(2)}%`);
+    eb.redraw(); ec.redraw();
   }
-  function decay(lam, t) { const q = 1 - net.eta * lam; return q <= 0 ? 0 : Math.exp(t * Math.log(q)); }
-  function theoryRes(t) {
-    let lo = 0, hi = 0;
-    net.E.vals.forEach((lam, k) => { const d = decay(Math.max(lam, 0), t), p = net.proj[k]; lo -= d * p.vy * p.vlo; hi -= d * p.vy * p.vhi; });
-    return { lo: Math.abs(lo / net.r0lo), hi: Math.abs(hi / net.r0hi) };
+  updE();
+
+  /* ================= 实验 3：两道题的 NTK 赛跑 ================= */
+  const PRE = [[4, 0, 1], [5, 4, 5], [4, 4, 8]];
+  const E0 = [10, 10];
+  const sK11 = LAB.slider('#n-k11', { label: '$K_{11}$', min: 0, max: 10, step: 0.5, value: 4, fmt: (v) => v.toFixed(1), onInput: () => updN() });
+  const sK12 = LAB.slider('#n-k12', { label: '$K_{12}=K_{21}$', min: -5, max: 5, step: 0.5, value: 0, fmt: (v) => v.toFixed(1), onInput: () => updN() });
+  const sK22 = LAB.slider('#n-k22', { label: '$K_{22}$', min: 0, max: 10, step: 0.5, value: 1, fmt: (v) => v.toFixed(1), onInput: () => updN() });
+  LAB.segmented('#n-preset', ['$\\operatorname{diag}(4,1)$（§4.3）', '$\\begin{bmatrix}5&4\\\\4&5\\end{bmatrix}$（练习 4.3/4.4）', '$\\begin{bmatrix}4&4\\\\4&8\\end{bmatrix}$（§4.4）'], 0, (i) => { sK11.set(PRE[i][0]); sK12.set(PRE[i][1]); sK22.set(PRE[i][2]); updN(); });
+  const sEta = LAB.slider('#n-eta', { label: '学习率 $\\eta$', min: 0.01, max: 0.5, step: 0.01, value: 0.1, fmt: (v) => v.toFixed(2), onInput: () => updN() });
+  const sT = LAB.slider('#n-T', { label: '走多少步 $t$', min: 3, max: 60, step: 1, value: 20, onInput: () => updN() });
+  function eig2(a, b, c) { // [[a,b],[b,c]]
+    const tr = a + c, det = a * c - b * b, disc = Math.sqrt(Math.max(0, tr * tr / 4 - det));
+    const l1 = tr / 2 + disc, l2 = tr / 2 - disc;
+    let u1;
+    if (Math.abs(b) > 1e-12) u1 = [l1 - c, b]; else u1 = a >= c ? [1, 0] : [0, 1];
+    const nn = Math.hypot(u1[0], u1[1]); u1 = [u1[0] / nn, u1[1] / nn];
+    return { l1, l2, u1, u2: [-u1[1], u1[0]] };
   }
-  function firstBelow(key) { let lo = 0, hi = 1e7; if (theoryRes(hi)[key] > 0.1) return Infinity; for (let it = 0; it < 60; it++) { const mid = (lo + hi) / 2; if (theoryRes(mid)[key] > 0.1) lo = mid; else hi = mid; } return hi; }
-  function linPred(t) { // NTK 线性化模型在网格上的预测
-    const coef = new Float64Array(NT);
-    net.E.vals.forEach((lam, k) => { const l = Math.max(lam, 1e-12), g = net.eta * l < 1e-9 ? net.eta * t : -Math.expm1(t * Math.log1p(-Math.min(net.eta * l, 0.999999))) / l; const c = g * net.proj[k].vy; net.E.vecs[k].forEach((v, i) => { coef[i] += c * v; }); });
-    return GXN.map((_, g) => { let s = 0; for (let i = 0; i < NT; i++) s += net.Tg[g * NT + i] * coef[i]; return s; });
+  const K = () => [sK11.get(), sK12.get(), sK22.get()];
+  function traj(T) {
+    const [a, b, c] = K(), eta = sEta.get(); let e = E0.slice(); const out = [e.slice()];
+    for (let t = 0; t < T; t++) { e = [e[0] - eta * (a * e[0] + b * e[1]), e[1] - eta * (b * e[0] + c * e[1])]; out.push(e.slice()); }
+    return out;
   }
-  function trainSteps(K) {
-    const n = net, { a, w, b, f, pre } = n, Mw = n.M, isq = 1 / Math.sqrt(Mw), r = new Float64Array(NT);
-    for (let it = 0; it < K && n.step < TMAX; it++) {
-      f.fill(0);
-      for (let m = 0; m < Mw; m++) { const am = a[m], wm = w[m], bm = b[m], o = m * NT; for (let i = 0; i < NT; i++) { const p = wm * XT[i] + bm; pre[o + i] = p; if (p > 0) f[i] += am * p; } }
-      for (let i = 0; i < NT; i++) { f[i] *= isq; r[i] = f[i] - n.y[i]; }
-      if (n.step >= n.nextLog || n.step === 0) { n.hist.push({ t: Math.max(n.step, 0.5), lo: Math.abs(M.dot(r, n.ulo) / n.r0lo), hi: Math.abs(M.dot(r, n.uhi) / n.r0hi) }); n.nextLog = Math.max(n.step + 1, Math.floor(n.step * 1.04)); }
-      const e = n.eta * isq;
-      for (let m = 0; m < Mw; m++) {
-        let ga = 0, gw = 0, gb = 0; const o = m * NT;
-        for (let i = 0; i < NT; i++) { const p = pre[o + i]; if (p > 0) { ga += r[i] * p; gw += r[i] * XT[i]; gb += r[i]; } }
-        const am = a[m]; a[m] -= e * ga; w[m] -= e * am * gw; b[m] -= e * am * gb;
-      }
-      n.step++;
-      if (n.step >= n.nextDrift) { const T = ntkMatrix(n, XT, XT); let d = 0; for (let i = 0; i < T.length; i++) d += (T[i] - n.T0[i]) ** 2; n.drift.push({ t: n.step, d: Math.sqrt(d) / n.nT0 }); n.nextDrift = Math.ceil(n.step * 1.5); }
-    }
+  function cont(tau) {
+    const [a, b, c] = K(), E = eig2(a, b, c);
+    const p1 = M.dot(E.u1, E0) * Math.exp(-E.l1 * tau), p2 = M.dot(E.u2, E0) * Math.exp(-E.l2 * tau);
+    return [p1 * E.u1[0] + p2 * E.u2[0], p1 * E.u1[1] + p2 * E.u2[1]];
   }
-  function netOut(xs) { const { a, w, b } = net, isq = 1 / Math.sqrt(net.M); return xs.map((x) => { let s = 0; for (let m = 0; m < net.M; m++) { const p = w[m] * x + b[m]; if (p > 0) s += a[m] * p; } return s * isq; }); }
-  function trainLoop() {
-    if (!running) return;
-    if (!isActive(sec3)) { running = false; runBtn.textContent = '▶ 继续训练'; return; }
-    const K = Math.max(1, Math.min(400, Math.floor(2.5e6 / (NT * net.M))));
-    trainSteps(K);
-    updN(); fit.redraw(); res.redraw(); drift.redraw();
-    if (net.step >= TMAX) {
-      running = false; runBtn.textContent = '▶ 重新训练';
-      const last = net.drift[net.drift.length - 1];
-      runs = runs.filter((r) => r.M !== net.M || r.A !== net.A); runs.push({ M: net.M, A: net.A, pts: net.drift.slice() }); if (runs.length > 6) runs.shift(); net.saved = true;
-      drift.redraw(); updN(last);
-      return;
-    }
-    requestAnimationFrame(trainLoop);
-  }
-  const sn = [LAB.stat('#n-stats', '训练步数 $t$'), LAB.stat('#n-stats', '低频残差（相对）', 'leaf'), LAB.stat('#n-stats', '高频残差（相对）', 'coral'), LAB.stat('#n-stats', '低频比高频快', 'plum')];
+  const nm = LAB.canvas('#n-main', (ctx, w, h) => {
+    const T = sT.get(), eta = sEta.get(), tr = traj(T);
+    const vals = tr.flat(), lo = Math.max(-60, Math.min(-1, ...vals)), hi = Math.min(60, Math.max(11, ...vals));
+    const P = new LAB.Plot(ctx, w, h, { xmin: 0, xmax: eta * T, ymin: lo, ymax: hi, xlabel: '连续时间 τ = η·t', ylabel: '误差 e', pad: { l: 46, r: 14, t: 12, b: 38 } }).axes();
+    P.hline(0, '#9aa5b1');
+    P.clip();
+    const taus = M.linspace(0, eta * T, 300), cs = taus.map(cont);
+    P.line(taus, cs.map((v) => v[0]), C.c1, 1.4, [5, 4]); P.line(taus, cs.map((v) => v[1]), C.c2, 1.4, [5, 4]);
+    const ts = tr.map((_, t) => eta * t);
+    P.line(ts, tr.map((v) => v[0]), LAB.mix(C.c1, '#ffffff', 0.5), 1.2); P.line(ts, tr.map((v) => v[1]), LAB.mix(C.c2, '#ffffff', 0.5), 1.2);
+    P.points(ts, tr.map((v) => v[0]), C.c1, 3.4); P.points(ts, tr.map((v) => v[1]), C.c2, 3.4);
+    P.unclip();
+  });
+  const stN = [LAB.stat('#n-stats', '特征值 $\\lambda_1,\\lambda_2$', 'plum'), LAB.stat('#n-stats', '每步公比 $1-\\eta\\lambda_i$', 'amber'), LAB.stat('#n-stats', '稳定上限 $2/\\lambda_{\\max}$', 'coral'), LAB.stat('#n-stats', '$t$ 步后的误差', 'teal')];
   function updN() {
-    const n = net, h = n.hist[n.hist.length - 1];
-    sn[0].set(`${n.step.toLocaleString()}<small>/ ${TMAX.toLocaleString()}</small>`);
-    sn[1].set(n.step ? h.lo.toFixed(3) : '1.000'); sn[2].set(n.step ? h.hi.toFixed(3) : '1.000');
-    sn[3].set(isFinite(n.t10.hi) ? `${(n.t10.hi / n.t10.lo).toFixed(0)}<small>倍（理论，降到 10% 所需步数之比）</small>` : '–');
-    const d = n.drift[n.drift.length - 1];
-    document.querySelector('#n-step').textContent = `第 ${n.step.toLocaleString()} 步 · M = ${n.M} · 核漂移 ${(d.d * 100).toFixed(1)}%`;
+    const [a, b, c] = K(), eta = sEta.get(), T = sT.get(), E = eig2(a, b, c), tr = traj(T);
+    const psd = E.l2 >= -1e-9;
+    stN[0].set(`${r4(E.l1)}, ${r4(E.l2)}${psd ? '' : '<small style="color:var(--coral)">不是半正定</small>'}`);
+    stN[1].set(`${r4(1 - eta * E.l1)}, ${r4(1 - eta * E.l2)}`);
+    const lim = E.l1 > 0 ? 2 / E.l1 : Infinity, stable = eta < lim - 1e-12;
+    stN[2].set(`${E.l1 > 0 ? r4(lim) : '∞'}<small style="color:${stable ? 'var(--leaf)' : 'var(--coral)'}">${stable ? 'η 在安全区' : 'η 越线，会发散'}</small>`);
+    const eT = tr[T];
+    stN[3].set(`(${M.fmt(eT[0], 3)}, ${M.fmt(eT[1], 3)})`);
+    document.querySelector('#n-sub').textContent = `K = [[${a}, ${b}], [${b}, ${c}]] · η = ${eta.toFixed(2)}`;
+    let hh = '<thead><tr><th>步数 $t$</th>' + M.range(5).map((t) => `<th class="num">${t}</th>`).join('') + '</tr></thead><tbody>';
+    hh += '<tr><td>第 1 题 $e_1$</td>' + M.range(5).map((t) => `<td class="num">${r4(tr[Math.min(t, T)][0])}</td>`).join('') + '</tr>';
+    hh += '<tr><td>第 2 题 $e_2$</td>' + M.range(5).map((t) => `<td class="num">${r4(tr[Math.min(t, T)][1])}</td>`).join('') + '</tr></tbody>';
+    const tb = document.querySelector('#n-table'); tb.innerHTML = hh; LAB.renderMath(tb);
+    nm.redraw();
   }
-  const fit = LAB.canvas('#n-fit', (ctx, w, h) => {
-    if (!net) return;
-    const P = new LAB.Plot(ctx, w, h, { xmin: -1, xmax: 1, ymin: -2.3, ymax: 2.3, xlabel: 'x', ylabel: 'f / A', pad: { l: 44, r: 12, t: 10, b: 36 } }).axes();
-    const k = net.k, A = net.A;
-    P.fn((x) => Math.sin(Math.PI * x) + Math.sin(k * Math.PI * x), '#C9D1DA', 4, null, 400);
-    P.points(XT, net.y.map((v) => v / A), '#9aa5b1', 2.6);
-    P.clip();
-    P.line(GXN, linPred(net.step).map((v) => v / A), C.c2, 2, [7, 4]);
-    P.line(GXN, netOut(GXN).map((v) => v / A), C.c1, 2.4);
-    P.unclip();
+  updN();
+  // ---- 第二部分：4.4 节算例
+  const WETA = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2];
+  const sWE = LAB.slider('#w-eta', { label: '学习率 $\\eta$', min: 0, max: WETA.length - 1, step: 1, value: 5, fmt: (i) => WETA[i], onInput: () => updW() });
+  const X1 = [1, 0], Y1 = 3, X2 = [1, 1], Y2 = 6;
+  const f = (x, th) => th[0] * th[0] * x[0] + th[1] * th[1] * x[1];
+  const grad = (x, th) => [2 * th[0] * x[0], 2 * th[1] * x[1]];
+  function step(eta) {
+    const th = [1, 1], e0 = [f(X1, th) - Y1, f(X2, th) - Y2], g1 = grad(X1, th), g2 = grad(X2, th);
+    const K0 = [[M.dot(g1, g1), M.dot(g1, g2)], [M.dot(g2, g1), M.dot(g2, g2)]];
+    const ntk = [e0[0] - eta * (K0[0][0] * e0[0] + K0[0][1] * e0[1]), e0[1] - eta * (K0[1][0] * e0[0] + K0[1][1] * e0[1])];
+    const dth = [-eta * (e0[0] * g1[0] + e0[1] * g2[0]), -eta * (e0[0] * g1[1] + e0[1] * g2[1])];
+    const th1 = [th[0] + dth[0], th[1] + dth[1]];
+    const real = [f(X1, th1) - Y1, f(X2, th1) - Y2];
+    return { e0, K0, ntk, dth, th1, real, gap: [real[0] - ntk[0], real[1] - ntk[1]] };
+  }
+  const wg = LAB.canvas('#w-gap', (ctx, w, h) => {
+    const eta = WETA[sWE.get()];
+    const P = new LAB.Plot(ctx, w, h, { xmin: 0.001, xmax: 0.2, ymin: 1e-5, ymax: 3, logx: true, logy: true, xtickValues: [0.001, 0.01, 0.1], xfmt: (v) => v, ytickValues: [1e-5, 1e-4, 1e-3, 1e-2, 0.1, 1], xlabel: '学习率 η', ylabel: '真实 − NTK', pad: { l: 50, r: 10, t: 10, b: 38 } }).axes();
+    P.fn((v) => step(v).gap[0], C.c1, 2.2); P.fn((v) => step(v).gap[1], C.c2, 2.2);
+    const s = step(eta); P.points([eta], [s.gap[0]], C.c1, 5, '#fff'); P.points([eta], [s.gap[1]], C.c2, 5, '#fff');
+    P.text(0.0012, 1.5, '第 1 题（蓝）· 第 2 题（橙）：斜率 2，即 ∝ η²', C.slate, 'left', 'middle', '11.5px ' + FONT);
   });
-  const res = LAB.canvas('#n-res', (ctx, w, h) => {
-    if (!net) return;
-    const P = new LAB.Plot(ctx, w, h, { xmin: 1, xmax: TMAX, logx: true, logy: true, ymin: 1e-3, ymax: 1.5, xtickValues: [1, 10, 100, 1000, 10000], xfmt: (v) => (v >= 1000 ? v / 1000 + 'k' : v), ytickValues: [0.001, 0.01, 0.1, 1], xlabel: '训练步数 t', ylabel: '相对残差', pad: { l: 48, r: 12, t: 10, b: 38 } }).axes();
-    const th = net.theory.filter((p) => p.t >= 1), cl = (v) => Math.max(v, 1.05e-3);
-    P.clip();
-    P.line(th.map((p) => p.t), th.map((p) => cl(p.lo)), C.c3, 1.6, [6, 4]);
-    P.line(th.map((p) => p.t), th.map((p) => cl(p.hi)), C.c4, 1.6, [6, 4]);
-    const hs = net.hist.filter((p) => p.t >= 1);
-    if (hs.length > 1) { P.line(hs.map((p) => p.t), hs.map((p) => cl(p.lo)), C.c3, 2.4); P.line(hs.map((p) => p.t), hs.map((p) => cl(p.hi)), C.c4, 2.4); }
-    P.unclip();
-    P.hline(0.1, C.slate, [2, 3], 1);
-    if (net.step > 0) P.vline(Math.max(1, net.step), C.slate, [3, 3]);
-  });
-  const drift = LAB.canvas('#n-drift', (ctx, w, h) => {
-    if (!net) return;
-    const all = runs.concat(net.step > 0 && !net.saved ? [{ M: net.M, pts: net.drift, cur: true }] : []);
-    const mx = Math.max(0.05, ...all.flatMap((r) => r.pts.map((p) => p.d)));
-    const P = new LAB.Plot(ctx, w, h, { xmin: 1, xmax: TMAX, logx: true, ymin: 0, ymax: Math.min(3, mx * 1.15), xtickValues: [1, 10, 100, 1000, 10000], xfmt: (v) => (v >= 1000 ? v / 1000 + 'k' : v), xlabel: '训练步数 t', ylabel: '相对漂移', yfmt: (v) => Math.round(v * 100) + '%', pad: { l: 48, r: 12, t: 10, b: 38 } }).axes();
-    all.forEach((r) => {
-      const col = LAB.mix(C.c5, C.c6, Math.log2(r.M / 16) / 7), p = r.pts.filter((q) => q.t >= 1);
-      if (p.length < 1) return;
-      P.line(p.map((q) => q.t), p.map((q) => q.d), col, r.cur ? 2.6 : 1.8, r.A > 0.5 ? [6, 3] : null);
-      const e = p[p.length - 1]; P.text(e.t, e.d, `M=${r.M}${r.A > 0.5 ? ', A=1' : ''} `, col, 'right', 'bottom', '600 11px ' + NUMF);
-    });
-    if (!all.length) P.text(3, mx * 0.5, '训练开始后显示', C.slate);
-  });
-  const spec = LAB.canvas('#n-spec', (ctx, w, h) => {
-    if (!net) return;
-    const v = net.E.vals.map((x) => Math.max(x, 1e-6)), top = Math.pow(10, Math.ceil(Math.log10(v[0])));
-    const P = new LAB.Plot(ctx, w, h, { xmin: 0.3, xmax: NT + 0.7, ymin: 1e-5, ymax: top, logy: true, xtickValues: [1, 10, 20, 30, 40], xfmt: (x) => x, xlabel: '特征值序号 k', ylabel: 'λ_k', pad: { l: 50, r: 10, t: 10, b: 38 } }).axes();
-    P.bars(M.range(NT).map((i) => i + 1), v, M.range(NT).map((i) => (i < 4 ? LAB.SERIES[i] : LAB.mix(C.c6, '#ffffff', 0.35))), (P.tx(2) - P.tx(1)) * 0.7, 1e-5);
-  });
-  const vecs = LAB.canvas('#n-vec', (ctx, w, h) => {
-    if (!net) return;
-    const P = new LAB.Plot(ctx, w, h, { xmin: -1, xmax: 1, ymin: -0.45, ymax: 0.45, xlabel: 'x', pad: { l: 44, r: 10, t: 10, b: 36 } }).axes();
-    for (let k = 0; k < 4; k++) { let v = net.E.vecs[k]; if (v[NT - 1] < 0) v = v.map((x) => -x); P.line(XT, v, LAB.SERIES[k], 2.2); P.text(-0.98, 0.4 - k * 0.075, `u${'₁₂₃₄'[k]}  λ=${net.E.vals[k].toPrecision(3)}`, LAB.SERIES[k], 'left', 'middle', '600 11px ' + NUMF); }
-  });
-  resetNet();
+  function updW() {
+    const eta = WETA[sWE.get()], s = step(eta);
+    const v = (a) => `(${r4(a[0])}, ${r4(a[1])})`;
+    let hh = '<thead><tr><th>项目</th><th>数值</th></tr></thead><tbody>';
+    hh += `<tr><td>切线向量 $\\mathbf g_1,\\mathbf g_2$</td><td class="num">(2, 0), (2, 2)</td></tr>`;
+    hh += `<tr><td>NTK 矩阵 $\\mathbf K_0$</td><td class="num">[[${s.K0[0][0]}, ${s.K0[0][1]}], [${s.K0[1][0]}, ${s.K0[1][1]}]]</td></tr>`;
+    hh += `<tr><td>初始误差 $\\mathbf e(0)$</td><td class="num">${v(s.e0)}</td></tr>`;
+    hh += `<tr><td>NTK 预测 $\\mathbf e(0)-\\eta\\mathbf K_0\\mathbf e(0)$</td><td class="num"><b style="color:var(--c1)">${v(s.ntk)}</b></td></tr>`;
+    hh += `<tr><td>参数改动 $\\Delta\\boldsymbol\\theta$，新参数 $\\boldsymbol\\theta_1$</td><td class="num">${v(s.dth)}，${v(s.th1)}</td></tr>`;
+    hh += `<tr><td>真实新误差</td><td class="num"><b style="color:var(--coral)">${v(s.real)}</b></td></tr>`;
+    hh += `<tr><td>两者之差 $(\\Delta\\theta_1^2,\\ \\Delta\\theta_1^2+\\Delta\\theta_2^2)$</td><td class="num">${v(s.gap)}</td></tr></tbody>`;
+    const tb = document.querySelector('#w-table'); tb.innerHTML = hh; LAB.renderMath(tb);
+    document.querySelector('#w-sub').textContent = `η = ${eta}`;
+    wg.redraw();
+  }
+  updW();
 })();

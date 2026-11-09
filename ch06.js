@@ -1,7 +1,7 @@
-/* 第 6 章：把时间拧成旋转角（RoPE） · 交互实验 */
+/* 第 6 章：怎么让模型知道词的先后顺序？（RoPE） · 交互实验 */
 (function () {
   const { COLORS: C, M } = LAB;
-  LAB.page({ bookRef: '对应书中 §6.2 二维旋转与 RoPE · §6.3 PI / NTK-aware / ALiBi · §6.4 手算算例 · §6.5 Abel 远程衰减' });
+  LAB.page({ bookRef: '对应书中 §6.1 狗咬人与人咬狗 · §6.3 RoPE 钟表指针 · §6.4 秒针、分针、时针与长文外推 · §6.5 四维手算演练' });
   // 窄屏下长公式与宽表格改为横向滚动，不撑破版面
   document.querySelectorAll('.formula, [style*="overflow-x"]').forEach((f) => { f.style.width = '0'; f.style.minWidth = '100%'; });
   const FONT = getComputedStyle(document.body).getPropertyValue('--font');
@@ -19,9 +19,9 @@
   }
   const fmtBase = (lg) => { const v = Math.pow(10, lg); if (Math.abs(lg - Math.round(lg)) < 1e-9) return '10' + '⁰¹²³⁴⁵⁶⁷⁸⁹'[Math.round(lg)]; const e = Math.floor(lg); return (v / Math.pow(10, e)).toFixed(1) + '×10' + '⁰¹²³⁴⁵⁶⁷⁸⁹'[e]; };
 
-  /* ================= 实验 1：复平面旋转 ================= */
+  /* ================= 实验 1：钟表指针转出相对距离 ================= */
   const sec1 = document.querySelector('#rotation');
-  let q = [1, 0], k = [0, 1], m = 1, n = 4, lock = false, playing = false, dragV = null, view = null;
+  let q = [1, 0], k = [1, 0], m = 1, n = 4, lock = false, playing = false, dragV = null, view = null;
   const MMAX = 60;
   const sm = LAB.slider('#r-m', { label: '查询的位置 $m$', min: 0, max: MMAX, step: 1, value: 1, onInput: (v) => { const d = n - m; m = v; if (lock) { n = M.clamp(m + d, 0, MMAX); m = n - d; sn.set(Math.round(n)); sm.set(Math.round(m)); } upd1(); } });
   const sn = LAB.slider('#r-n', { label: '键的位置 $n$', min: 0, max: MMAX, step: 1, value: 4, onInput: (v) => { const d = n - m; n = v; if (lock) { m = M.clamp(n - d, 0, MMAX); n = m + d; sm.set(Math.round(m)); sn.set(Math.round(n)); } upd1(); } });
@@ -43,8 +43,11 @@
     };
     requestAnimationFrame(step);
   };
-  document.querySelector('#r-bookA').onclick = () => { playing = false; q = [1, 0]; k = [0, 1]; m = 1; n = 4; sth.set(30); sm.set(1); sn.set(4); upd1(); };
-  document.querySelector('#r-bookB').onclick = () => { playing = false; q = [1, 0]; k = [0, 1]; m = 11; n = 14; sth.set(30); sm.set(11); sn.set(14); upd1(); };
+  const preset1 = (qq, kk, th, mm, nn) => { playing = false; q = qq; k = kk; m = mm; n = nn; sth.set(th); sm.set(mm); sn.set(nn); upd1(); };
+  document.querySelector('#r-bookA').onclick = () => preset1([1, 0], [1, 0], 30, 1, 4);
+  document.querySelector('#r-bookB').onclick = () => preset1([1, 0], [1, 0], 30, 2, 5);
+  document.querySelector('#r-ex1').onclick = () => preset1([1, 0], [0, 1], 90, 2, 1);
+  document.querySelector('#r-ex3').onclick = () => preset1([1, 0], [0, 1], 90, 2, 3);
   const sr = [LAB.stat('#r-stats', '$\\langle\\tilde{\\mathbf q}_m,\\tilde{\\mathbf k}_n\\rangle$', 'coral'), LAB.stat('#r-stats', '相对距离 $n-m$'), LAB.stat('#r-stats', '旋转前 $\\mathbf q^\\top\\mathbf k$', 'teal'), LAB.stat('#r-stats', '$\\|\\tilde{\\mathbf q}_m\\|=\\|\\mathbf q\\|$', 'amber')];
   function upd1() {
     const th = sth.get() * DEG, qt = rot(q, m * th), kt = rot(k, n * th);
@@ -109,7 +112,7 @@
   });
   upd1();
 
-  /* ================= 实验 2：多频叠加与远程衰减 ================= */
+  /* ================= 实验 2：秒针时针一起转（多频叠加与远程衰减） ================= */
   const sd = LAB.slider('#d-d', { label: '维度 $d$（共 $d/2$ 根指针）', min: 8, max: 256, step: 8, value: 128, onInput: () => upd2() });
   const sb = LAB.slider('#d-base', { label: '底数 base', min: 2, max: 7, step: 0.05, value: 4, fmt: fmtBase, onInput: () => upd2() });
   const DeltaOf = (v) => (v === 0 ? 0 : Math.round(Math.pow(10, v / 20)));
@@ -158,8 +161,25 @@
     const D = DeltaOf(sD.get()); if (D >= 1) { const r = measures(th, D); P.vline(D, C.slate, [3, 3]); P.points([D], [r.B], C.c4, 6, '#fff'); }
   });
   upd2();
+  // 书中 4 维算例：快针 90°、慢针 15°
+  const t4 = LAB.slider('#t4-D', { label: '相对距离 $\\Delta=n-m$', min: 0, max: 24, step: 1, value: 4, onInput: () => updT4() });
+  const st4 = [LAB.stat('#t4-stats', '快针得分 $\\cos(90^\\circ\\Delta)$', 'teal'), LAB.stat('#t4-stats', '慢针得分 $\\cos(15^\\circ\\Delta)$', 'plum'), LAB.stat('#t4-stats', '总分', 'coral')];
+  const fast = (D) => Math.cos(90 * D * DEG), slow = (D) => Math.cos(15 * D * DEG);
+  const r3 = (x) => (Math.abs(x) < 5e-10 ? 0 : x).toFixed(3);
+  function updT4() { const D = t4.get(); st4[0].set(r3(fast(D))); st4[1].set(r3(slow(D))); st4[2].set(r3(fast(D) + slow(D))); t4c.redraw(); }
+  const t4c = LAB.canvas('#t4-plot', (ctx, w, h) => {
+    const P = new LAB.Plot(ctx, w, h, { xmin: -0.5, xmax: 24.5, ymin: -2.2, ymax: 2.3, xtickValues: [0, 4, 8, 12, 16, 20, 24], xlabel: '相对距离 Δ（个词）', ylabel: '内积', pad: { l: 44, r: 12, t: 10, b: 38 } }).axes();
+    const xs = M.range(25);
+    P.hline(0, '#9aa5b1');
+    P.fn(slow, C.c5, 1.6, [6, 4]);
+    P.points(xs, xs.map(fast), LAB.mix(C.c6, '#ffffff', 0.3), 3);
+    P.line(xs, xs.map((D) => fast(D) + slow(D)), C.c4, 2.2); P.points(xs, xs.map((D) => fast(D) + slow(D)), C.c4, 3.2);
+    const D = t4.get(); P.vline(D, C.slate, [3, 3]); P.points([D], [fast(D) + slow(D)], C.amber, 6.5, '#fff');
+    P.text(24.3, 2.15, '红 = 总分　紫虚线 = 慢针　青点 = 快针', C.slate, 'right', 'top', '11px ' + FONT);
+  });
+  updT4();
 
-  /* ================= 实验 3：长度外推 ================= */
+  /* ================= 实验 3：调慢表针读长文（PI 与 NTK） ================= */
   const LTR = [2048, 4096, 8192, 16384];
   let lIdx = 1;
   LAB.segmented('#e-L', ['2K', '4K', '8K', '16K'], 1, (i) => { lIdx = i; upd3(); });
@@ -170,7 +190,8 @@
   const eH = LAB.slider('#e-H', { label: 'ALiBi 头数 $H$', min: 1, max: 32, step: 1, value: 8, onInput: () => upd3() });
   function idxOf(v) { const J = ed ? ed.get() / 2 : 64; return 1 + Math.round(v * (J - 1)); }
   const METHODS = [{ n: '原始 RoPE', col: C.c1 }, { n: '位置插值 PI', col: C.c2 }, { n: 'NTK-aware', col: C.c3 }];
-  function thetaM(mi, i, d, base, s) { const t = Math.pow(base, -2 * (i - 1) / d); return mi === 0 ? t : mi === 1 ? t / s : t * Math.pow(s, -2 * (i - 1) / d); }
+  // NTK-aware：新底数 base·s^{d/(d-2)}，等价于 θ_i · s^{-2(i-1)/(d-2)}（最慢的时针恰好放慢 s 倍）
+  function thetaM(mi, i, d, base, s) { const t = Math.pow(base, -2 * (i - 1) / d); return mi === 0 ? t : mi === 1 ? t / s : t * Math.pow(s, -2 * (i - 1) / (d - 2)); }
   function unseen(mi, i, d, base, s, Ltr) { const At = Ltr * Math.pow(base, -2 * (i - 1) / d), Ae = s * Ltr * thetaM(mi, i, d, base, s); return At >= TAU ? 0 : Math.max(0, Math.min(Ae, TAU) - At); }
   const est = [LAB.stat('#e-stats', '测试长度 $L_{\\text{test}}$'), LAB.stat('#e-stats', '原始 RoPE 越界的维度组', 'coral'), LAB.stat('#e-stats', 'PI 的相邻词角差', 'amber'), LAB.stat('#e-stats', 'NTK-aware 最大未见角度', 'leaf')];
   function upd3() {
@@ -184,7 +205,7 @@
     const rows = [
       [METHODS[0], 'θ_i', res[0], 1, '长文时慢维转进从未见过的角度'],
       [METHODS[1], 'θ_i / s', res[1], 1 / s, '近处相邻词分辨率降为 1/s'],
-      [METHODS[2], 'θ_i · s^{-2(i-1)/d_k}', res[2], 1, '中间频段仍有部分越界'],
+      [METHODS[2], 'θ_i · s^{-2(i-1)/(d_k-2)}', res[2], 1, '中间频段仍有部分越界'],
     ].map(([mm, f, r, res1, cost]) => `<tr><td><b style="color:${mm.col}">${mm.n}</b></td><td>${LAB.tex(f)}</td><td class="num">${r.cnt} / ${J}</td><td class="num">${(r.mx / DEG).toFixed(0)}°</td><td class="num">${(res1 / DEG).toFixed(2)}°</td><td>${cost}</td></tr>`);
     rows.push(`<tr><td><b style="color:${C.c5}">ALiBi</b></td><td>${LAB.tex('-\\lambda_h|m-n|')}</td><td class="num">0</td><td class="num">–</td><td class="num">–</td><td>最平缓的头在 ${Lte >= 1024 ? Lte / 1024 + 'K' : Lte} 处仍被乘上 ${M.fmt(Math.exp(-lmin * Lte), 1)}</td></tr>`);
     document.querySelector('#e-table').innerHTML = `<thead><tr><th>方案</th><th>第 $i$ 组角速度</th><th>越界的维度组</th><th>最大未见角度</th><th>相邻词角差（第 1 组）</th><th>代价</th></tr></thead><tbody>${rows.join('')}</tbody>`;

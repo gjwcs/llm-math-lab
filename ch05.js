@@ -1,7 +1,7 @@
-/* 第 5 章：注意力机制的统计力学 · 交互实验 */
+/* 第 5 章：注意力机制（Attention）到底在算什么？ · 交互实验 */
 (function () {
   const { COLORS: C, M } = LAB;
-  LAB.page({ bookRef: '对应书中 §5.2 缩放点积与方差守恒 · §5.3 Softmax 雅可比 · §5.5 GQA 与 MLA · §5.6 手算算例' });
+  LAB.page({ bookRef: '对应书中 §5.1 图书馆借书 · §5.2 Softmax 求导 · §5.3 为什么除以 √dₖ · §5.4 多头、因果掩码与 KV 缓存 · §5.5 手算演练' });
   // 窄屏下长公式与宽表格改为横向滚动，不撑破版面
   document.querySelectorAll('.formula, [style*="overflow-x"]').forEach((f) => { f.style.width = '0'; f.style.minWidth = '100%'; });
   const FONT = getComputedStyle(document.body).getPropertyValue('--font');
@@ -10,34 +10,102 @@
   function schedule(fn) { let p = false; return () => { if (p) return; p = true; requestAnimationFrame(() => { p = false; fn(); }); }; }
   function histogram(vals, lo, hi, nb) { const h = new Float64Array(nb), bw = (hi - lo) / nb; for (const v of vals) { const k = Math.floor((v - lo) / bw); if (k >= 0 && k < nb) h[k]++; } for (let k = 0; k < nb; k++) h[k] /= vals.length * bw; return { h, bw, lo }; }
 
-  /* ================= 实验 1：注意力热力图 ================= */
-  const BOOK = {
-    tok: ['小猫', '抓', '老鼠'],
-    Q: [[2, 0, 2, 0], [0, 2, 0, 2], [2, 2, 0, 0]],
-    K: [[2, 0, 0, 0], [0, 2, 0, 2], [2, 0, 2, 0]],
-    V: [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]],
+
+  /* ================= 实验 1：图书馆借书三步走 ================= */
+  const LIB = [
+    { name: '数码科技', k: [1, 0], v: [10, 20], col: C.c1 },
+    { name: '生鲜水果', k: [0, 1], v: [0, 100], col: C.c3 },
+    { name: '数码与水果跨界', k: [1, 1], v: [30, 40], col: C.c5 },
+  ];
+  let libMode = 0, libRound = false, lib = null;
+  const lq1 = LAB.slider('#l-q1', { label: '查询的“科技”分量 $q_1$', min: -2, max: 3, step: 0.1, value: 1, fmt: (v) => v.toFixed(1), onInput: () => updLib() });
+  const lq2 = LAB.slider('#l-q2', { label: '查询的“美食”分量 $q_2$', min: -2, max: 3, step: 0.1, value: 0, fmt: (v) => v.toFixed(1), onInput: () => updLib() });
+  LAB.segmented('#l-mode', ['Softmax（先取指数）', '直接除以总分'], 0, (i) => { libMode = i; updLib(); });
+  LAB.checkbox('#l-round', '按书中手算：取 $e\\approx2.7$，百分比保留两位小数', false, (v) => { libRound = v; updLib(); });
+  document.querySelector('#l-book').onclick = () => { lq1.set(1); lq2.set(0); updLib(); };
+  document.querySelector('#l-neg').onclick = () => { lq1.set(-1); lq2.set(2); updLib(); };
+  const sl = [LAB.stat('#l-stats', '指数总和 $Z$', 'amber'), LAB.stat('#l-stats', '笔记“售价”$o_1$', 'teal'), LAB.stat('#l-stats', '笔记“好评”$o_2$', 'plum'), LAB.stat('#l-stats', '百分比之和', 'coral')];
+  function updLib() {
+    const q = [lq1.get(), lq2.get()];
+    const s = LIB.map((b) => M.dot(q, b.k));
+    const base = libRound ? 2.7 : Math.E;
+    let e = null, Z = null, a, ok = true, warn = '';
+    if (libMode === 0) {
+      e = s.map((v) => Math.pow(base, v)); Z = M.sum(e); a = e.map((v) => v / Z);
+      if (libRound) a = a.map((v) => Math.round(v * 100) / 100);
+    } else {
+      const tot = M.sum(s);
+      if (Math.abs(tot) < 0.05) { ok = false; a = s.map(() => NaN); warn = `总分 $=${tot.toFixed(2)}$，几乎为 $0$：除以它当场崩溃！`; }
+      else { a = s.map((v) => v / tot); if (a.some((v) => v < 0)) warn = '出现了负百分比：书被“倒着抄”了，这就是书中说的荒唐事。'; }
+    }
+    const o = ok ? [0, 1].map((k) => M.sum(LIB.map((b, i) => a[i] * b.v[k]))) : [NaN, NaN];
+    lib = { q, s, e, Z, a, o, ok };
+    sl[0].set(libMode === 0 ? Z.toFixed(3) : '–');
+    sl[1].set(ok ? o[0].toFixed(2) : '–'); sl[2].set(ok ? o[1].toFixed(2) : '–');
+    sl[3].set(ok ? M.sum(a).toFixed(2) : '–');
+    const wEl = document.querySelector('#l-warn'); wEl.innerHTML = warn; LAB.renderMath(wEl); wEl.style.color = warn ? 'var(--coral)' : '';
+    const f2 = (v) => (Number.isInteger(v) ? String(v) : v.toFixed(2));
+    const vec = (v) => `\\begin{bmatrix}${v.map(f2).join('\\\\')}\\end{bmatrix}`;
+    const parts = [];
+    parts.push(`s=(${s.map(f2).join(',\\ ')})`);
+    if (libMode === 0) parts.push(`e^{s}${libRound ? '\\approx' : '='}(${e.map((v) => v.toFixed(2)).join(',\\ ')}),\\ Z=${Z.toFixed(2)}`);
+    if (ok) {
+      parts.push(`\\boldsymbol\\alpha${libRound ? '\\approx' : '='}(${a.map((v) => v.toFixed(libRound ? 2 : 3)).join(',\\ ')})`);
+      parts.push(`\\mathbf o=${a.map((v, i) => `${v.toFixed(libRound ? 2 : 3)}${vec(LIB[i].v)}`).join('+')}=${vec(o.map((v) => +v.toFixed(2)))}`);
+    }
+    const el = document.querySelector('#l-steps');
+    el.innerHTML = parts.map((t) => `<div style="margin:4px 0 8px">${LAB.tex(t)}</div>`).join('');
+    lsc.redraw(); lw.redraw();
+  }
+  const libBars = (ctx, w, h, vals, lo, hi, fmt, ylabel) => {
+    const P = new LAB.Plot(ctx, w, h, { xmin: -0.6, xmax: 2.6, ymin: lo, ymax: hi, xtickValues: [], ylabel, yticks: 4, pad: { l: 44, r: 10, t: 16, b: 34 } }).axes();
+    const bw = (P.tx(1) - P.tx(0)) * 0.5;
+    if (lo < 0) P.hline(0, C.slate, null, 1);
+    LIB.forEach((b, i) => {
+      const v = vals[i]; if (!isFinite(v)) return;
+      P.bars([i], [v], v < 0 ? C.coral : b.col, bw, 0);
+      P.text(i, v, fmt(v), v < 0 ? C.coral : C.navy, 'center', v < 0 ? 'top' : 'bottom', '600 12px ' + NUMF);
+      ctx.save(); ctx.fillStyle = C.ink; ctx.font = '12px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(`第 ${i + 1} 本`, P.tx(i), P.y0 + 8); ctx.restore();
+    });
   };
-  const SENT = ['那只', '小猫', '没有', '跳进', '水坑', '里', '，', '因为', '它', '太', '怕', '湿', '了'];
+  const lsc = LAB.canvas('#l-score', (ctx, w, h) => { if (!lib) return; const m = Math.max(3, ...lib.s.map(Math.abs)); libBars(ctx, w, h, lib.s, Math.min(0, -m * (lib.s.some((v) => v < 0) ? 1 : 0)), m * 1.15, (v) => v.toFixed(1), '打分 s'); });
+  const lw = LAB.canvas('#l-weight', (ctx, w, h) => {
+    if (!lib) return;
+    const a = lib.a.filter((v) => isFinite(v)), lo = Math.min(0, ...a), hi = Math.max(1, ...a);
+    libBars(ctx, w, h, lib.a, lo < 0 ? lo * 1.25 : 0, hi * 1.12, (v) => (v * 100).toFixed(libRound ? 0 : 1) + '%', '百分比 α');
+  });
+  updLib();
+
+  /* ================= 实验 3（上）：因果掩码热力图 ================= */
+  const BOOK = {
+    tok: ['我', '喝', '水'],
+    Q: [[2, 0, 0, 0], [2, 2, 0, 0], [0, 2, 2, 0]],
+    K: [[2, 0, 0, 0], [0, 2, 0, 0], [0, 0, 2, 0]],
+    V: [[10, 0], [0, 20], [30, 30]],
+  };
+  const SENT = ['小明', '把', '刚', '买', '的', '苹果', '吃掉', '了', '，', '因为', '它', '太', '甜', '了'];
+  const IT = 10, APPLE = 5;
   const DK = [2, 4, 8, 16, 32, 64, 128, 256];
-  let mode = 0, scale = true, mask = true, coref = true, seed = 3, sel = 2, hover = null, cur = null;
-  const segData = LAB.segmented('#h-data', ['书中 3 词元算例', '“它”指的是谁？'], 0, (i) => { mode = i; sel = i === 0 ? 2 : 8; document.querySelector('#h-dk').style.display = i === 0 ? 'none' : ''; document.querySelector('#h-coref').style.display = i === 0 ? 'none' : ''; compute(); });
+  let mode = 0, scale = true, mask = true, fillZero = false, coref = true, seed = 3, sel = 2, hover = null, cur = null;
+  const segData = LAB.segmented('#h-data', ['书中“我 / 喝 / 水”', '“它”指的是谁？'], 0, (i) => { mode = i; sel = i === 0 ? 2 : IT; document.querySelector('#h-dk').style.display = i === 0 ? 'none' : ''; document.querySelector('#h-coref').style.display = i === 0 ? 'none' : ''; compute(); });
   const sDk = LAB.slider('#h-dk', { label: '向量维度 $d_k$', min: 0, max: DK.length - 1, step: 1, value: 3, fmt: (i) => DK[i], onInput: () => compute() });
   LAB.checkbox('#h-scale', '除以 $\\sqrt{d_k}$', true, (v) => { scale = v; compute(); });
-  LAB.checkbox('#h-mask', '因果掩码 $\\mathbf M$（看不见未来）', true, (v) => { mask = v; compute(); });
-  LAB.checkbox('#h-coref', '让“它”的查询向量对齐“小猫”的键向量', true, (v) => { coref = v; compute(); });
+  LAB.checkbox('#h-mask', '因果掩码 $\\mathbf M$（看不见未来）', true, (v) => { mask = v; document.querySelector('#h-fill-label').style.display = document.querySelector('#h-fill').style.display = v ? '' : 'none'; compute(); });
+  LAB.segmented('#h-fill', ['填 $-\\infty$（正确）', '填 $0$（新手坑）'], 0, (i) => { fillZero = i === 1; compute(); });
+  LAB.checkbox('#h-coref', '让“它”的查询向量对齐“苹果”的键向量', true, (v) => { coref = v; compute(); });
   document.querySelector('#h-dk').style.display = 'none'; document.querySelector('#h-coref').style.display = 'none';
   document.querySelector('#h-reseed').onclick = () => { seed++; if (mode === 0) segData.set(1); else compute(); };
   function sentenceQKV(d) {
     const R = LAB.rng(seed * 101 + d), T = SENT.length;
     const g = () => M.range(d).map(() => R.normal());
     const Q = M.range(T).map(g), K = M.range(T).map(g), V = M.range(T).map(() => M.range(4).map(() => R.normal()));
-    if (coref) { const rho = 0.75; Q[8] = Q[8].map((v, i) => Math.sqrt(1 - rho * rho) * v + rho * K[1][i]); }
+    if (coref) { const rho = 0.75; Q[IT] = Q[IT].map((v, i) => Math.sqrt(1 - rho * rho) * v + rho * K[APPLE][i]); }
     return { tok: SENT, Q, K, V, d };
   }
   function attention(X) {
     const T = X.tok.length, d = X.Q[0].length, c = scale ? Math.sqrt(d) : 1;
     const S = X.Q.map((q) => X.K.map((k) => M.dot(q, k)));
-    const Z = S.map((r, t) => r.map((s, j) => (mask && j > t ? -Infinity : s / c)));
+    const Z = S.map((r, t) => r.map((s, j) => (mask && j > t ? (fillZero ? 0 : -Infinity) : s / c)));
     const A = Z.map(softmax);
     const O = A.map((a) => X.V[0].map((_, k) => a.reduce((acc, w, j) => acc + w * X.V[j][k], 0)));
     return { ...X, T, d, c, S, Z, A, O };
@@ -72,12 +140,13 @@
         ctx.fillStyle = '#F2F4F7'; ctx.fillRect(X, Y, cs, cs);
         ctx.strokeStyle = '#E1E6EC'; ctx.lineWidth = 1; ctx.beginPath(); for (let k = -cs; k < cs; k += 6) { ctx.moveTo(X + Math.max(0, k), Y + Math.max(0, -k)); ctx.lineTo(X + Math.min(cs, k + cs), Y + Math.min(cs, cs - k)); } ctx.stroke();
       } else { ctx.fillStyle = LAB.heat(Math.pow(a, 0.7)); ctx.fillRect(X, Y, cs, cs); }
+      if (mask && fillZero && j > t) { ctx.save(); ctx.strokeStyle = C.coral; ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.strokeRect(X + 2, Y + 2, cs - 4, cs - 4); ctx.restore(); }
       if (cs >= 30 && isFinite(cur.Z[t][j])) { ctx.fillStyle = a > 0.45 ? '#fff' : C.navy; ctx.font = '600 ' + Math.min(15, cs * 0.3) + 'px ' + NUMF; ctx.textAlign = 'center'; ctx.fillText(a.toFixed(T > 4 ? 2 : 3), X + cs / 2, Y + cs / 2); }
     }
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; for (let i = 0; i <= T; i++) { ctx.beginPath(); ctx.moveTo(x0 + i * cs, y0); ctx.lineTo(x0 + i * cs, y0 + side); ctx.moveTo(x0, y0 + i * cs); ctx.lineTo(x0 + side, y0 + i * cs); ctx.stroke(); }
     ctx.strokeStyle = C.coral; ctx.lineWidth = 2.2; ctx.strokeRect(x0 + 1, y0 + sel * cs + 1, side - 2, cs - 2);
     if (hover) {
-      const [t, j] = hover, s = cur.Z[t][j], txt1 = `${cur.tok[t]} → ${cur.tok[j]}`, txt2 = isFinite(s) ? `得分 ${s.toFixed(2)} · 权重 ${(cur.A[t][j] * 100).toFixed(1)}%` : '未来位置：得分 −∞，权重 0';
+      const [t, j] = hover, s = cur.Z[t][j], txt1 = `${cur.tok[t]} → ${cur.tok[j]}`, txt2 = isFinite(s) ? `得分 ${s.toFixed(2)} · 权重 ${(cur.A[t][j] * 100).toFixed(1)}%${mask && fillZero && j > t ? '（偷看了未来！）' : ''}` : '未来位置：得分 −∞，权重 0';
       ctx.strokeStyle = C.navy; ctx.lineWidth = 2; ctx.strokeRect(x0 + j * cs, y0 + t * cs, cs, cs);
       ctx.font = '12.5px ' + FONT; const bw = Math.max(ctx.measureText(txt1).width, ctx.measureText(txt2).width) + 18;
       let bx = x0 + (j + 1) * cs + 6, by = y0 + t * cs - 4; if (bx + bw > w) bx = x0 + j * cs - bw - 6; if (bx < 2) bx = 2; by = M.clamp(by, 2, h - 46);
@@ -115,22 +184,23 @@
     const X = attention({ tok: BOOK.tok, Q: BOOK.Q, K: BOOK.K, V: BOOK.V });
     const f3 = (v) => (isFinite(v) ? (Math.abs(v - Math.round(v)) < 1e-9 ? String(Math.round(v)) : v.toFixed(3)) : '-\\infty');
     const blk = (label, tex) => `<div style="display:inline-block;vertical-align:top;margin:4px 14px 10px 0"><div class="small muted" style="margin-bottom:2px">${label}</div>${LAB.tex(tex)}</div>`;
-    const zl = `${scale ? '\\frac{\\mathbf Q\\mathbf K^\\top' : '\\mathbf Q\\mathbf K^\\top'}${mask ? '+\\mathbf M' : ''}${scale ? '}{\\sqrt{4}}' : ''}`;
+    const zl = `${scale ? '\\frac{\\mathbf Q\\mathbf K^\\top}{\\sqrt{4}}' : '\\mathbf Q\\mathbf K^\\top'}${mask ? (fillZero ? '\\ (j>i\\text{ 填 }0)' : '\\ (j>i\\text{ 填 }-\\infty)') : ''}`;
     document.querySelector('#h-book').innerHTML =
       blk('① 查询 / 键 / 值', `\\mathbf Q=${mat(BOOK.Q)},\\ \\mathbf K=${mat(BOOK.K)},\\ \\mathbf V=${mat(BOOK.V)}`) +
       blk('② 内积打分', `\\mathbf Q\\mathbf K^\\top=${mat(X.S)}`) +
-      blk(`③ ${scale ? '除以 √dₖ = 2' : '不缩放'}${mask ? '，加因果掩码' : ''}`, `${zl}=${mat(X.Z, f3)}`) +
+      blk(`③ ${scale ? '除以 √dₖ = 2' : '不缩放'}${mask ? '，盖上因果挡板' : ''}`, `${zl}=${mat(X.Z, f3)}`) +
       blk('④ 逐行 Softmax', `\\mathbf A=${mat(X.A, (v) => v.toFixed(3))}`) +
-      blk('⑤ 加权提货', `\\mathbf O=\\mathbf A\\mathbf V=${mat(X.O, (v) => v.toFixed(3))}`);
+      blk('⑤ 按百分比抄笔记', `\\mathbf O=\\mathbf A\\mathbf V=${mat(X.O, (v) => v.toFixed(2))}`);
   }
   compute();
 
-  /* ================= 实验 2：√dₖ 之谜 ================= */
-  const DK2 = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024];
+  /* ================= 实验 2：√dₖ 救活导数 ================= */
+  const DK2 = [2, 4, 8, 16, 32, 64, 100, 128, 256, 512, 1024];
   let scale2 = false, seed2 = 1;
   const s2dk = LAB.slider('#s-dk', { label: '头维度 $d_k$', min: 0, max: DK2.length - 1, step: 1, value: 6, fmt: (i) => DK2[i], onInput: () => run2() });
   LAB.checkbox('#s-scale', '除以 $\\sqrt{d_k}$', false, (v) => { scale2 = v; run2(); });
   const s2T = LAB.slider('#s-T', { label: '键的个数 $T$', min: 2, max: 64, step: 1, value: 8, onInput: () => { buildMC(); run2(); } });
+  s2dk.set(DK2.indexOf(100));
   const s2tau = LAB.slider('#s-tau', { label: '温度 $\\tau$', min: 0.1, max: 4, step: 0.05, value: 1, fmt: (v) => v.toFixed(2), onInput: () => run2() });
   document.querySelector('#s-resample').onclick = () => { seed2++; buildMC(); run2(); };
   // 蒙特卡洛：给定 q，各 z_j = qᵀk_j 独立同分布 N(0, ‖q‖²)，故只需抽 ‖q‖ 与标准正态 ε_j
@@ -161,6 +231,16 @@
     st2[1].set(`${(js.mx * 100).toFixed(1)}%<small>均匀 ${(100 / s2T.get()).toFixed(1)}%</small>`);
     st2[2].set(js.J.toFixed(3)); st2[3].set(`${(js.sat * 100).toFixed(0)}%`);
     document.querySelector('#s-hcap').innerHTML = LAB.tex(`z=\\mathbf q^\\top\\mathbf k/(${scale2 ? '\\sqrt{d_k}' : '1'}\\cdot\\tau)`) + `，3000 次抽样；虚线为 ${LAB.tex(`\\mathcal N(0,\\ ${(Math.sqrt(d) / c).toFixed(2)}^2)`)}。`;
+    // 书中算例：两个候选词，得分 (2σ, 0)，σ = √dₖ
+    const s1 = 2 * Math.sqrt(d), sig = (x) => 1 / (1 + Math.exp(-x));
+    const pU = sig(s1 / tau), pS = sig(s1 / (Math.sqrt(d) * tau)), gU = pU * (1 - pU), gS = pS * (1 - pS);
+    document.querySelector('#s-two-sub').textContent = `dₖ = ${d}，2 个标准差 = ${s1.toFixed(d === 100 ? 0 : 2)} 分`;
+    const fe = (x) => (x < 1e-3 ? M.fmt(x, 2) : x.toFixed(4));
+    document.querySelector('#s-two').innerHTML = `<table class="data"><thead><tr><th></th><th>送进 Softmax 的得分</th><th>$p_1$</th><th>导数 $p_1(1-p_1)$</th></tr></thead><tbody>
+      <tr><td><b style="color:${C.c4}">不除 $\\sqrt{d_k}$</b></td><td class="num">(${(s1 / tau).toFixed(2)}, 0)</td><td class="num">${pU > 0.999999 ? (1 - (1 - pU)).toFixed(9) : pU.toFixed(4)}</td><td class="num">${fe(gU)}</td></tr>
+      <tr><td><b style="color:${C.c3}">除以 $\\sqrt{d_k}$</b></td><td class="num">(${(s1 / (Math.sqrt(d) * tau)).toFixed(2)}, 0)</td><td class="num">${pS.toFixed(4)}</td><td class="num">${fe(gS)}</td></tr>
+      </tbody></table><div class="caption">两者相差 ${M.fmt(gS / gU, 2)} 倍。$d_k=100$、$\\tau=1$ 时正是书中的 $2.1\\times10^{-9}$ 对 $0.105$。</div>`;
+    LAB.renderMath(document.querySelector('#s-two'));
     hist2.redraw(); bars2.redraw(); jac.redraw(); maxc.redraw();
   }
   const hist2 = LAB.canvas('#s-hist', (ctx, w, h) => {
@@ -273,4 +353,14 @@
     VAR.forEach((v, i) => P.points([T], [gb(i, T)], v.col, 5, '#fff'));
   });
   presetSel.value = '0'; upd3();
+  // 练习 5.3：KV Cache 省下的乘法
+  const xd = LAB.slider('#x-d', { label: '向量维度 $d$', min: 10, max: 400, step: 10, value: 100, onInput: () => updX() });
+  const xt = LAB.slider('#x-t', { label: '正在生成第 $t$ 个词', min: 2, max: 1000, step: 1, value: 100, onInput: () => updX() });
+  const sx = [LAB.stat('#x-stats', '不用缓存', 'coral'), LAB.stat('#x-stats', '用缓存', 'leaf'), LAB.stat('#x-stats', '省掉的比例', 'teal')];
+  function updX() {
+    const d = xd.get(), t = xt.get(), a = t * d * d, b = d * d;
+    sx[0].set(`${a.toLocaleString()}<small>次</small>`); sx[1].set(`${b.toLocaleString()}<small>次</small>`);
+    sx[2].set(`${((1 - b / a) * 100).toFixed(t >= 1000 ? 1 : 0)}%<small>快 ${t} 倍</small>`);
+  }
+  updX();
 })();

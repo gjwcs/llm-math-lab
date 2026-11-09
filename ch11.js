@@ -1,7 +1,7 @@
 /* 第 11 章：低资源微调的线性代数奇迹：交互实验 */
 (function () {
   const { COLORS: C, M } = LAB;
-  LAB.page({ bookRef: '对应书中 §11.2 LoRA 低秩重参数化与非对称初始化 · Eckart-Young-Mirsky 定理 · §11.3 QLoRA 的 NF4 量化与 DoRA' });
+  LAB.page({ bookRef: '对应书中 §11.1 显存账 · §11.2 一列乘一行与秩 · §11.3 LoRA 参数账、零延迟合并与非对称初始化 · §11.4 2×2 手算算例' });
 
   const $ = (s) => document.querySelector(s);
   const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
@@ -12,7 +12,136 @@
   const rgbOf = (hex) => { hex = hex.replace('#', ''); return [0, 2, 4].map((i) => parseInt(hex.substr(i, 2), 16)); };
   const lerp3 = (a, b, t) => [0, 1, 2].map((i) => Math.round(a[i] + (b[i] - a[i]) * t));
 
-  /* ================= 实验 1：参数量与显存 ================= */
+
+  /* ================= 实验 1：一列乘一行拼积木 ================= */
+  const V1 = { b1: [1, 2, 1, 2], a1: [1, 0, 2, 1], b2: [0, 1, 0, -1], a2: [0, 3, 1, 0], two: false };
+  const inputs1 = {};
+  function vecInputs(host, key, label, n) {
+    const el = $(host);
+    el.innerHTML = `<span class="lab">${label}</span>` + M.range(n).map((i) => `<input type="number" step="1" min="-9" max="9" data-i="${i}">`).join('');
+    LAB.renderMath(el);
+    const ins = Array.from(el.querySelectorAll('input'));
+    ins.forEach((inp, i) => { inp.value = V1[key][i]; inp.addEventListener('input', () => { const v = Number(inp.value); V1[key][i] = isFinite(v) ? v : 0; upd1b(); }); });
+    inputs1[key] = ins;
+  }
+  vecInputs('#v-b1', 'b1', '$\\mathbf b_1$', 4); vecInputs('#v-a1', 'a1', '$\\mathbf a_1^\\top$', 4);
+  vecInputs('#v-b2', 'b2', '$\\mathbf b_2$', 4); vecInputs('#v-a2', 'a2', '$\\mathbf a_2^\\top$', 4);
+  const chkTwo = LAB.checkbox('#chk-two', '再加第 2 块积木（$\\mathbf B$ 变成 $4\\times2$）', false, (v) => { V1.two = v; upd1b(); });
+  const setVecs = (o) => { Object.assign(V1, JSON.parse(JSON.stringify(o))); ['b1', 'a1', 'b2', 'a2'].forEach((k) => inputs1[k].forEach((inp, i) => { inp.value = V1[k][i]; })); chkTwo.set(V1.two); upd1b(); };
+  $('#btn-book1').onclick = () => setVecs({ b1: [1, 2, 1, 2], a1: [1, 0, 2, 1], b2: [0, 1, 0, -1], a2: [0, 3, 1, 0], two: false });
+  $('#btn-book2').onclick = () => setVecs({ b1: [1, 2, 1, 2], a1: [1, 0, 2, 1], b2: [0, 1, 0, -1], a2: [0, 3, 1, 0], two: true });
+  let randSeed = 3;
+  $('#btn-rand').onclick = () => { const R = LAB.rng(randSeed++), f = () => R.int(7) - 3; setVecs({ b1: [f(), f(), f(), f()], a1: [f(), f(), f(), f()], b2: [f(), f(), f(), f()], a2: [f(), f(), f(), f()], two: V1.two }); };
+  const outer = (b, a) => b.map((bi) => a.map((aj) => bi * aj));
+  const addM = (X, Y) => X.map((r, i) => r.map((v, j) => v + Y[i][j]));
+  function rankOf(Mx) {
+    const A = Mx.map((r) => r.slice()), m = A.length, n = A[0].length; let rk = 0;
+    for (let c = 0; c < n && rk < m; c++) {
+      let p = rk; for (let i = rk + 1; i < m; i++) if (Math.abs(A[i][c]) > Math.abs(A[p][c])) p = i;
+      if (Math.abs(A[p][c]) < 1e-9) continue;
+      [A[rk], A[p]] = [A[p], A[rk]];
+      for (let i = 0; i < m; i++) if (i !== rk) { const f = A[i][c] / A[rk][c]; for (let j = c; j < n; j++) A[i][j] -= f * A[rk][j]; }
+      rk++;
+    }
+    return rk;
+  }
+  // 第 i 行是否是第 1 个非零行的倍数
+  function multipleOfFirst(Mx) {
+    const base = Mx.find((r) => r.some((v) => v !== 0));
+    return Mx.map((r) => { if (!base) return true; return rankOf([base, r]) <= 1; });
+  }
+  const blkCv = LAB.canvas('#blk-draw', (ctx, w, h) => {
+    const P1 = outer(V1.b1, V1.a1), P2 = outer(V1.b2, V1.a2), S = V1.two ? addM(P1, P2) : P1;
+    const mats = V1.two ? [['b₁a₁ᵀ', P1], ['b₂a₂ᵀ', P2], ['BA', S]] : [['b', V1.b1.map((v) => [v])], ['aᵀ', [V1.a1]], ['ΔW = baᵀ', S]];
+    const mx = Math.max(1, ...[].concat(...mats.map((m) => m[1].flat().map(Math.abs))));
+    const narrow = w < 520;
+    const cell = Math.min(narrow ? 30 : 40, (h - 70) / 4, (w - 120) / (V1.two ? 12 : 9.5));
+    const colr = (v) => (v === 0 ? '#ffffff' : v > 0 ? LAB.mix('#ffffff', C.c1, Math.min(1, 0.15 + 0.85 * v / mx)) : LAB.mix('#ffffff', C.c4, Math.min(1, 0.15 + 0.85 * -v / mx)));
+    const drawM = (Mx, x0, y0, hl) => {
+      Mx.forEach((r, i) => r.forEach((v, j) => {
+        ctx.fillStyle = colr(v); ctx.fillRect(x0 + j * cell, y0 + i * cell, cell - 2, cell - 2);
+        ctx.fillStyle = Math.abs(v) / mx > 0.55 ? '#fff' : C.ink; ctx.font = `600 ${Math.round(cell * 0.38)}px Avenir Next, sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(+v.toFixed(2)), x0 + j * cell + cell / 2 - 1, y0 + i * cell + cell / 2 - 1);
+      }));
+      if (hl) hl.forEach((on, i) => { if (!on) { ctx.strokeStyle = C.amber; ctx.lineWidth = 2; ctx.strokeRect(x0 - 3, y0 + i * cell - 2, Mx[0].length * cell + 4, cell + 2); } });
+    };
+    const label = (t, x, y, col) => { ctx.fillStyle = col || C.navy; ctx.font = `600 13px PingFang SC, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(t, x, y); };
+    const op = (t, x, y) => { ctx.fillStyle = C.ink; ctx.font = '600 22px Avenir Next, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t, x, y); };
+    const y0 = 34;
+    if (!V1.two) {
+      const wB = cell, wA = 4 * cell, wS = 4 * cell, gap = narrow ? 26 : 40, tot = wB + wA + wS + 2 * gap;
+      let x = Math.max(8, (w - tot - 40) / 2);
+      drawM(mats[0][1], x, y0); label('b（4×1）', x + wB / 2, y0 - 6, C.c1);
+      x += wB + gap; op('×', x - gap / 2, y0 + 2 * cell);
+      drawM(mats[1][1], x, y0 + 1.5 * cell); label('aᵀ（1×4）', x + wA / 2, y0 + 1.5 * cell - 6, C.c1);
+      x += wA + gap; op('=', x - gap / 2, y0 + 2 * cell);
+      const mul = multipleOfFirst(S); drawM(S, x, y0, mul); label('ΔW = baᵀ（4×4）', x + wS / 2, y0 - 6);
+      // 行倍数
+      const base = V1.a1; ctx.font = '600 12px Avenir Next, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = C.amber;
+      if (base.some((v) => v !== 0)) V1.b1.forEach((bi, i) => ctx.fillText(`×${bi}`, x + wS + 4, y0 + i * cell + cell / 2));
+    } else {
+      const wS = 4 * cell, gap = narrow ? 22 : 34, tot = 3 * wS + 2 * gap;
+      let x = Math.max(8, (w - tot - 70) / 2);
+      drawM(P1, x, y0); label('b₁a₁ᵀ', x + wS / 2, y0 - 6, C.c1);
+      x += wS + gap; op('+', x - gap / 2, y0 + 2 * cell);
+      drawM(P2, x, y0); label('b₂a₂ᵀ', x + wS / 2, y0 - 6, C.c4);
+      x += wS + gap; op('=', x - gap / 2, y0 + 2 * cell);
+      const mul = multipleOfFirst(S); drawM(S, x, y0, mul); label('BA', x + wS / 2, y0 - 6);
+      if (mul.some((v) => !v)) { ctx.fillStyle = C.amber; ctx.font = '12px PingFang SC, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText('框出的行不是', x + wS + 12, y0 + cell); ctx.fillText('第 1 行的倍数', x + wS + 12, y0 + cell + 16); }
+    }
+  });
+  const sb1 = LAB.stat('#blk-stats', '存了几个数'), sb2 = LAB.stat('#blk-stats', '变出几个格子', 'teal'), sb3 = LAB.stat('#blk-stats', '秩（独立方向个数）', 'amber');
+  function upd1b() {
+    $('#block2').style.display = V1.two ? '' : 'none';
+    const S = V1.two ? addM(outer(V1.b1, V1.a1), outer(V1.b2, V1.a2)) : outer(V1.b1, V1.a1), rk = rankOf(S);
+    sb1.set(V1.two ? '16' : '8'); sb2.set('16'); sb3.set(String(rk));
+    const mul = multipleOfFirst(S);
+    $('#blk-cap').innerHTML = V1.two
+      ? `两块秩 1 积木相加就是 $4\\times2$ 的窄表乘 $2\\times4$ 的扁表。结果的秩为 <b>${rk}</b>；${mul.every((v) => v) ? '所有行仍是第 1 行的倍数（两块积木撞了方向）。' : '琥珀色框出的行已经不是第 1 行的倍数。'}`
+      : `每一行都是 $\\mathbf a^\\top$ 的倍数（右侧标出了倍数 $b_i$），所以秩为 <b>${rk}</b>。`;
+    LAB.renderMath($('#blk-cap'));
+    blkCv.redraw();
+  }
+  // 大表
+  const BIG = { d: 4096, k: 4096, r: 8 };
+  const DIMS = [256, 512, 1000, 1024, 2048, 4096, 8192, 12288, 16384];
+  const RS = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048];
+  const dS = LAB.slider('#big-d', { label: '行数 $d$', min: 0, max: DIMS.length - 1, step: 1, value: DIMS.indexOf(4096), fmt: (v) => String(DIMS[v]), onInput: (v) => { BIG.d = DIMS[v]; updBig(); } });
+  const kS = LAB.slider('#big-k', { label: '列数 $k$', min: 0, max: DIMS.length - 1, step: 1, value: DIMS.indexOf(4096), fmt: (v) => String(DIMS[v]), onInput: (v) => { BIG.k = DIMS[v]; updBig(); } });
+  const rS = LAB.slider('#big-r', { label: '秩 $r$', min: 0, max: RS.length - 1, step: 1, value: RS.indexOf(8), fmt: (v) => String(RS[v]), onInput: (v) => { BIG.r = RS[v]; updBig(); } });
+  const setBig = (d, k, r) => { BIG.d = d; BIG.k = k; BIG.r = r; dS.set(DIMS.indexOf(d)); kS.set(DIMS.indexOf(k)); rS.set(RS.indexOf(r)); updBig(); };
+  $('#btn-4096').onclick = () => setBig(4096, 4096, 8);
+  $('#btn-1000').onclick = () => setBig(1000, 1000, 2);
+  const bigCv = LAB.canvas('#big-draw', (ctx, w, h) => {
+    const { d, k, r } = BIG, half = w / 2;
+    const bars = [
+      [[['存 ΔW：dk', d * k, C.c1], ['存 B、A：r(d+k)', r * (d + k), C.c3]], 0, '参数个数'],
+      [[['(BA)x：drk+dk', d * r * k + d * k, C.c4], ['ΔW·x：dk', d * k, C.c1], ['B(Ax)：r(k+d)', r * (k + d), C.c3]], half, '乘法次数'],
+    ];
+    bars.forEach(([rows, x0, title]) => {
+      const vmax = Math.max(...rows.map((r0) => r0[1])), lo = 1e2;
+      const P = new LAB.Plot(ctx, half, h, { xmin: -0.6, xmax: rows.length - 0.4, ymin: lo, ymax: Math.pow(10, Math.ceil(Math.log10(vmax * 1.5))), logy: true, xtickValues: [], ylabel: title, pad: { l: 52, r: 10, t: 16, b: 46 } });
+      ctx.save(); ctx.translate(x0, 0); P.axes();
+      rows.forEach(([name, v, col], i) => {
+        P.bars([i], [v], col, Math.min(64, half / (rows.length + 2)), lo);
+        P.text(i, v, M.big(v), C.ink, 'center', 'bottom', '600 12px Avenir Next, sans-serif');
+        ctx.fillStyle = C.ink; ctx.font = '12px PingFang SC, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; const [n1, n2] = name.split('：'); ctx.fillText(n1, P.tx(i), P.y0 + 6); ctx.fillStyle = C.slate; ctx.fillText(n2, P.tx(i), P.y0 + 22);
+      });
+      ctx.restore();
+    });
+  });
+  const bs1 = LAB.stat('#big-stats', '参数压缩比 $r(d+k)/dk$', 'teal'), bs2 = LAB.stat('#big-stats', '省掉的参数', 'leaf'), bs3 = LAB.stat('#big-stats', '旁路比乘满秩 $\\Delta\\mathbf W$ 快', 'amber'), bs4 = LAB.stat('#big-stats', '$\\mathbf B(\\mathbf A\\mathbf x)$ 比 $(\\mathbf B\\mathbf A)\\mathbf x$ 快', 'coral');
+  function updBig() {
+    const { d, k, r } = BIG, ratio = r * (d + k) / (d * k);
+    bs1.set(ratio >= 1 ? `${ratio.toFixed(2)}<small>（不省反亏）</small>` : (ratio * 100).toPrecision(3) + '<small>%</small>');
+    bs2.set(ratio >= 1 ? '0<small>%</small>' : ((1 - ratio) * 100).toFixed(2) + '<small>%</small>');
+    bs3.set((d * k / (r * (k + d))).toPrecision(3) + '<small>倍</small>');
+    bs4.set(((d * r * k + d * k) / (r * (k + d))).toFixed(0) + '<small>倍</small>');
+    bigCv.redraw();
+  }
+  upd1b(); updBig();
+
+  /* ================= 实验 2：LoRA 显存账本 ================= */
   const MODELS = [
     { name: 'LLaMA-7B', d: 4096, ff: 11008, L: 32, kv: 4096, V: 32000 },
     { name: 'LLaMA-2-70B', d: 8192, ff: 28672, L: 80, kv: 1024, V: 32000 },
@@ -91,104 +220,78 @@
   }
   upd1();
 
-  /* ================= 实验 2：低秩谱与初始化 ================= */
-  const N2 = 48;
-  const S2 = { gamma: 1.2, noise: 0.02, r: 8, log: false, seed: 4 };
-  let SV = null;
-  function orthCols(R, n) { const Q = []; for (let j = 0; j < n; j++) { let v = Float64Array.from({ length: n }, () => R.normal()); for (const q of Q) { let p = 0; for (let i = 0; i < n; i++) p += v[i] * q[i]; for (let i = 0; i < n; i++) v[i] -= p * q[i]; } let nn = 0; for (let i = 0; i < n; i++) nn += v[i] * v[i]; nn = Math.sqrt(nn); for (let i = 0; i < n; i++) v[i] /= nn; Q.push(v); } return Q; }
-  // 单边 Jacobi SVD：输入按列存储的方阵，返回降序奇异值与左右奇异向量（列）
-  function svd(cols) {
-    const n = cols.length, U = cols.map((c) => Float64Array.from(c)), V = M.range(n).map((j) => { const v = new Float64Array(n); v[j] = 1; return v; });
-    for (let sweep = 0; sweep < 40; sweep++) {
-      let off = 0;
-      for (let p = 0; p < n - 1; p++) for (let q = p + 1; q < n; q++) {
-        const up = U[p], uq = U[q]; let a = 0, b = 0, g = 0;
-        for (let i = 0; i < n; i++) { a += up[i] * up[i]; b += uq[i] * uq[i]; g += up[i] * uq[i]; }
-        if (Math.abs(g) <= 1e-15 * Math.sqrt(a * b)) continue;
-        off = Math.max(off, Math.abs(g) / Math.sqrt(a * b));
-        const z = (b - a) / (2 * g), t = Math.sign(z || 1) / (Math.abs(z) + Math.sqrt(1 + z * z)), c = 1 / Math.sqrt(1 + t * t), s = c * t;
-        for (let i = 0; i < n; i++) { const x = up[i], y = uq[i]; up[i] = c * x - s * y; uq[i] = s * x + c * y; }
-        const vp = V[p], vq = V[q];
-        for (let i = 0; i < n; i++) { const x = vp[i], y = vq[i]; vp[i] = c * x - s * y; vq[i] = s * x + c * y; }
+  /* ================= 实验 3：一零一随机与无痕合并 ================= */
+  const I3 = { scheme: 0, rand: [1, 2], g: [[-1, -2], [-2, -4]], eta: 0.2, x: [1, 1] };
+  const W0 = [[10, 0], [0, 10]];
+  const numRow = (host, label, vals, onset) => {
+    const el = $(host);
+    el.innerHTML = `<span class="lab">${label}</span>` + vals.map(() => '<input type="number" step="0.5">').join('');
+    LAB.renderMath(el);
+    const ins = Array.from(el.querySelectorAll('input'));
+    ins.forEach((inp, i) => { inp.value = vals[i]; inp.addEventListener('input', () => { const v = Number(inp.value); onset(i, isFinite(v) ? v : 0); upd3(); }); });
+    return ins;
+  };
+  const inRand = numRow('#i-rand', '随机', I3.rand, (i, v) => { I3.rand[i] = v; });
+  const inG1 = numRow('#i-g1', '$\\mathbf G$ 行 1', I3.g[0], (i, v) => { I3.g[0][i] = v; });
+  const inG2 = numRow('#i-g2', '$\\mathbf G$ 行 2', I3.g[1], (i, v) => { I3.g[1][i] = v; });
+  const inX = numRow('#i-x', '$\\mathbf x$', I3.x, (i, v) => { I3.x[i] = v; });
+  const etaS3 = LAB.slider('#i-eta', { label: '学习率 $\\eta$', min: 0.05, max: 1, step: 0.05, value: 0.2, fmt: (v) => v.toFixed(2), onInput: (v) => { I3.eta = v; upd3(); } });
+  const schemeSeg = LAB.segmented('#i-scheme', ['LoRA：$\\mathbf B_0=\\mathbf 0$', '全零', '反过来：$\\mathbf A_0=\\mathbf 0$'], 0, (i) => { I3.scheme = i; upd3(); });
+  $('#i-book').onclick = () => {
+    I3.rand = [1, 2]; I3.g = [[-1, -2], [-2, -4]]; I3.x = [1, 1]; I3.eta = 0.2;
+    inRand.forEach((inp, i) => { inp.value = I3.rand[i]; }); inG1.forEach((inp, i) => { inp.value = I3.g[0][i]; });
+    inG2.forEach((inp, i) => { inp.value = I3.g[1][i]; }); inX.forEach((inp, i) => { inp.value = I3.x[i]; });
+    etaS3.set(0.2); schemeSeg.set(0); upd3();
+  };
+  const fm = (v) => String(+(+v).toFixed(3));
+  const colV = (b) => `\\begin{bmatrix}${b.map(fm).join('\\\\')}\\end{bmatrix}`;
+  const rowV = (a) => `\\begin{bmatrix}${a.map(fm).join('&')}\\end{bmatrix}`;
+  const mat2 = (Mx) => `\\begin{bmatrix}${Mx.map((r) => r.map(fm).join('&')).join('\\\\')}\\end{bmatrix}`;
+  const isZero = (v) => v.every((x) => Math.abs(x) < 1e-12);
+  const i1 = LAB.stat('#i-stats', '第 0 步 $\\Delta\\mathbf W_0$ 为零？'), i2 = LAB.stat('#i-stats', '第 1 步谁先动', 'teal'), i3 = LAB.stat('#i-stats', '两路输出相等？', 'leaf');
+  function upd3() {
+    const G = I3.g, eta = I3.eta;
+    let B = I3.scheme === 2 ? I3.rand.slice() : [0, 0];
+    let A = I3.scheme === 0 ? I3.rand.slice() : [0, 0];
+    const rows = [];
+    const dW = (b, a) => b.map((bi) => a.map((aj) => bi * aj));
+    rows.push(['第 0 步', `\\mathbf B_0=${colV(B)},\\ \\mathbf A_0=${rowV(A)}`, `\\Delta\\mathbf W_0=${mat2(dW(B, A))}`]);
+    const dW0zero = isZero(dW(B, A).flat());
+    let firstMove = '';
+    for (let t = 1; t <= 2; t++) {
+      const gB = [G[0][0] * A[0] + G[0][1] * A[1], G[1][0] * A[0] + G[1][1] * A[1]];   // G A^T
+      const gA = [B[0] * G[0][0] + B[1] * G[1][0], B[0] * G[0][1] + B[1] * G[1][1]];   // B^T G
+      if (t === 1) firstMove = !isZero(gB) && !isZero(gA) ? 'A、B 同时' : !isZero(gB) ? '先动 B' : !isZero(gA) ? '先动 A' : '都不动';
+      B = B.map((v, i) => v - eta * gB[i]); A = A.map((v, i) => v - eta * gA[i]);
+      rows.push([`第 ${t} 步`, `\\mathbf G_{\\mathbf B}=${colV(gB)},\\ \\mathbf G_{\\mathbf A}=${rowV(gA)}`, `\\mathbf B_${t}=${colV(B)},\\ \\mathbf A_${t}=${rowV(A)}`]);
+      if (t === 1) {
+        const Wm = W0.map((r, i) => r.map((v, j) => v + B[i] * A[j]));
+        const x = I3.x, one = Wm.map((r) => r[0] * x[0] + r[1] * x[1]);
+        const ax = A[0] * x[0] + A[1] * x[1], two = W0.map((r, i) => r[0] * x[0] + r[1] * x[1] + B[i] * ax);
+        rows.push(['合并（用第 1 步的 $\\mathbf B_1,\\mathbf A_1$）', `\\mathbf W_{\\text{merged}}=\\mathbf W_0+\\mathbf B_1\\mathbf A_1=${mat2(Wm)}`, `\\text{一路 }${colV(one)}\\ \\text{两路 }${colV(two)}`]);
+        i3.set(one.every((v, i) => Math.abs(v - two[i]) < 1e-9) ? '是' : '否');
       }
-      if (off < 1e-12) break;
     }
-    const sig = U.map((u) => Math.hypot(...u)), order = M.range(n).sort((i, j) => sig[j] - sig[i]);
-    return { s: order.map((i) => sig[i]), U: order.map((i) => U[i].map((v) => v / (sig[i] || 1))), V: order.map((i) => V[i]) };
+    i1.set(dW0zero ? '是' : '<span style="color:var(--coral)">否</span>'); i2.set(firstMove);
+    let html = '<tr><th>步骤</th><th>梯度 / 初值</th><th>结果</th></tr>';
+    rows.forEach(([s, a, b]) => { html += `<tr><td>${s}</td><td>$${a}$</td><td>$${b}$</td></tr>`; });
+    $('#i-table').innerHTML = html; LAB.renderMath($('#i-table'));
   }
-  function build2() {
-    const R = LAB.rng(40 + S2.seed), n = N2;
-    const Uo = orthCols(R, n), Vo = orthCols(R, n), st = M.range(n).map((i) => Math.pow(i + 1, -S2.gamma));
-    const Rn = LAB.rng(900 + S2.seed);
-    const cols = M.range(n).map((j) => { const c = new Float64Array(n); for (let i = 0; i < n; i++) { let v = 0; for (let q = 0; q < n; q++) v += Uo[q][i] * st[q] * Vo[q][j]; c[i] = v + (S2.noise / Math.sqrt(n)) * Rn.normal(); } return c; });
-    const res = svd(cols);
-    SV = { cols, st, ...res, tot: M.sum(res.s.map((v) => v * v)) };
-  }
-  LAB.slider('#s-decay', { label: '谱衰减指数 $\\gamma$（$\\sigma_i=i^{-\\gamma}$）', min: 0, max: 3, step: 0.05, value: S2.gamma, fmt: (v) => v.toFixed(2), onInput: (v) => { S2.gamma = v; build2(); upd2(); } });
-  LAB.slider('#s-noise', { label: '噪声强度', min: 0, max: 0.5, step: 0.005, value: S2.noise, fmt: (v) => v.toFixed(3), onInput: (v) => { S2.noise = v; build2(); upd2(); } });
-  LAB.slider('#s-r', { label: 'LoRA 秩 $r$', min: 1, max: N2, step: 1, value: S2.r, onInput: (v) => { S2.r = v; upd2(); } });
-  LAB.checkbox('#s-log', '奇异值用对数纵轴', false, (v) => { S2.log = v; barsCv.redraw(); });
-  $('#s-resample').onclick = () => { S2.seed++; build2(); buildInit(); upd2(); };
-  const energyAt = (r) => M.sum(SV.s.slice(0, r).map((v) => v * v)) / SV.tot;
-  const barsCv = LAB.canvas('#s-bars', (ctx, w, h) => {
-    const s = SV.s, lg = S2.log, mx = Math.max(s[0], SV.st[0]) * 1.1;
-    const mn = lg ? Math.pow(10, Math.floor(Math.log10(Math.max(1e-6, Math.min(...s, ...SV.st))))) : 0;
-    const P = new LAB.Plot(ctx, w, h, { xmin: 0.3, xmax: N2 + 0.7, ymin: lg ? mn : 0, ymax: lg ? Math.pow(10, Math.ceil(Math.log10(mx))) : mx, logy: lg, xtickValues: [1, 8, 16, 24, 32, 40, 48], xlabel: '奇异值序号 i', ylabel: 'σ_i', pad: { l: 48, r: 12, t: 12, b: 36 } }).axes();
-    const bw = (P.tx(2) - P.tx(1)) * 0.72, xs = M.range(N2).map((i) => i + 1);
-    P.bars(xs, s, xs.map((i) => (i <= S2.r ? C.c6 : '#cfd6de')), bw, lg ? mn : 0);
-    P.points(xs, SV.st, C.navy, 2.2);
-    P.vline(S2.r + 0.5, C.c4, [4, 3], 1.4);
-    P.text(S2.r + 0.7, lg ? Math.pow(10, Math.ceil(Math.log10(mx))) * 0.7 : mx * 0.95, ` r = ${S2.r}`, C.c4, 'left', 'top', '600 12px Avenir Next, sans-serif');
-  });
-  const enCv = LAB.canvas('#s-energy', (ctx, w, h) => {
-    const P = new LAB.Plot(ctx, w, h, { xmin: 0, xmax: N2, ymin: 0, ymax: 1, xtickValues: [0, 8, 16, 24, 32, 40, 48], yfmt: (v) => v * 100 + '%', xlabel: '秩 r', pad: { l: 46, r: 12, t: 12, b: 36 } }).axes();
-    const rs = M.range(N2 + 1), en = rs.map(energyAt);
-    P.line(rs, en, C.c6, 2.4); P.line(rs, en.map((e) => Math.sqrt(Math.max(0, 1 - e))), C.c4, 2.4);
-    P.vline(S2.r, C.ink, [2, 3], 1);
-    P.points([S2.r, S2.r], [energyAt(S2.r), Math.sqrt(Math.max(0, 1 - energyAt(S2.r)))], C.ink, 4, '#fff');
-  });
-  const heatCv = LAB.canvas('#s-heat', (ctx, w, h) => {
-    const n = N2, r = S2.r, gap = 10, side = Math.min((w - 2 * gap) / 3, h - 28), y0 = 4;
-    const full = (i, j) => SV.cols[j][i];
-    const approx = (i, j) => { let v = 0; for (let q = 0; q < r; q++) v += SV.s[q] * SV.U[q][i] * SV.V[q][j]; return v; };
-    const A = [], Ar = [];
-    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { A.push(full(i, j)); Ar.push(approx(i, j)); }
-    const mx = Math.max(...A.map(Math.abs)) || 1;
-    const W0 = rgbOf('#ffffff'), CB = rgbOf(C.c1), CR = rgbOf(C.c4);
-    const col = (v) => { const t = Math.min(1, Math.abs(v) / mx); return v < 0 ? lerp3(W0, CB, Math.sqrt(t)) : lerp3(W0, CR, Math.sqrt(t)); };
-    [['ΔW', A], [`秩 ${r} 近似`, Ar], ['残差', A.map((v, k) => v - Ar[k])]].forEach(([name, arr], q) => {
-      const off = document.createElement('canvas'); off.width = n; off.height = n;
-      const oc = off.getContext('2d'), img = oc.createImageData(n, n);
-      arr.forEach((v, k) => { const c = col(v); img.data[4 * k] = c[0]; img.data[4 * k + 1] = c[1]; img.data[4 * k + 2] = c[2]; img.data[4 * k + 3] = 255; });
-      oc.putImageData(img, 0, 0);
-      const x0 = q * (side + gap);
-      ctx.imageSmoothingEnabled = false; ctx.drawImage(off, x0, y0, side, side);
-      ctx.strokeStyle = C.line; ctx.strokeRect(x0 + 0.5, y0 + 0.5, side - 1, side - 1);
-      ctx.fillStyle = C.ink; ctx.font = '12px PingFang SC, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(name, x0 + side / 2, y0 + side + 6);
-    });
-  });
-  const s1 = LAB.stat('#s-stats', '能量占比 $\\sum_{i\\le r}\\sigma_i^2/\\sum\\sigma_i^2$', 'teal');
-  const s2 = LAB.stat('#s-stats', '相对 Frobenius 误差', 'coral');
-  const s3 = LAB.stat('#s-stats', 'LoRA 参数 $r(d+k)$', 'leaf');
-  const s4 = LAB.stat('#s-stats', '原矩阵参数 $dk$');
-  function upd2() {
-    const e = energyAt(S2.r);
-    s1.set((e * 100).toFixed(2) + '<small>%</small>'); s2.set((Math.sqrt(Math.max(0, 1 - e)) * 100).toFixed(2) + '<small>%</small>');
-    s3.set(String(S2.r * 2 * N2)); s4.set(String(N2 * N2));
-    barsCv.redraw(); enCv.redraw(); heatCv.redraw();
-  }
+  upd3();
+
+  let initSeed = 4;
   // 初始化对比：min ½‖BA − T‖²
   const INITS = [['lora', 'LoRA', C.c3], ['zero', '全零', C.c4], ['both', '都随机', C.c2]];
   let INIT = null;
   function buildInit() {
-    const d = 16, k = 16, r = 4, lr = 0.05, steps = 150, R = LAB.rng(70 + S2.seed);
+    const d = 16, k = 16, r = 4, lr = 0.05, steps = 150, R = LAB.rng(70 + initSeed);
     const mat = (m, n, f) => M.range(m).map(() => M.range(n).map(f));
     const mm = (A, B) => A.map((row) => B[0].map((_, j) => { let t = 0; for (let q = 0; q < row.length; q++) t += row[q] * B[q][j]; return t; }));
     const tr = (A) => A[0].map((_, j) => A.map((rw) => rw[j]));
     const fro = (A) => Math.sqrt(A.reduce((a, rw) => a + rw.reduce((b, v) => b + v * v, 0), 0));
     let T = mm(mat(d, 2, () => R.normal()), mat(2, k, () => R.normal())); const tn = fro(T); T = T.map((rw) => rw.map((x) => (x * 3) / tn));
     INIT = INITS.map(([mode]) => {
-      const R2 = LAB.rng(11 + S2.seed);
+      const R2 = LAB.rng(11 + initSeed);
       let A = mode === 'zero' ? mat(r, k, () => 0) : mat(r, k, () => R2.normal() / Math.sqrt(k));
       let B = mode === 'both' ? mat(d, r, () => R2.normal() / Math.sqrt(r)) : mat(d, r, () => 0);
       const loss = []; let first = null;
@@ -212,120 +315,6 @@
     INIT.forEach((it, q) => { html += `<tr><td><b style="color:${INITS[q][2]}">●</b> ${INITS[q][1]}</td><td>${it.first.w0.toFixed(3)}</td><td>${it.first.gA.toFixed(3)}</td><td>${it.first.gB.toFixed(3)}</td><td>${fe(it.loss[it.loss.length - 1])}</td></tr>`; });
     $('#s-init-table').innerHTML = html; LAB.renderMath($('#s-init-table')); initCv.redraw();
   }
-  build2(); buildInit(); upd2(); initTable();
-  $('#s-resample').addEventListener('click', initTable);
-
-  /* ================= 实验 3：NF4 vs INT4 ================= */
-  // QLoRA 的 NF4 刻度：8 个正分位点 + 7 个负分位点 + 0，再除以最大值
-  const OFFSET = 0.9677083;
-  const lin = (a, b, n) => M.range(n).map((i) => a + ((b - a) * i) / (n - 1));
-  const NF4 = (() => { const pos = lin(OFFSET, 0.5, 9).slice(0, 8).map(M.norminv), neg = lin(OFFSET, 0.5, 8).slice(0, 7).map((p) => -M.norminv(p)); const v = pos.concat(neg, [0]).sort((a, b) => a - b), mx = Math.max(...v); return v.map((x) => x / mx); })();
-  const INT4 = lin(-1, 1, 16);
-  const BLOCKS = [16, 32, 64, 128, 256, 1024, 4096];
-  const NS = [4096, 16384, 65536];
-  const Q3 = { block: 64, n: 16384, seed: 1, model: 0, dq: false };
-  let QR = null;
-  function quantize(levels, x) { let best = 0, bd = Infinity; for (let k = 0; k < 16; k++) { const dd = Math.abs(x - levels[k]); if (dd < bd) { bd = dd; best = k; } } return best; }
-  function run3() {
-    const R = LAB.rng(500 + Q3.seed), n = Q3.n, B = Q3.block;
-    const w = Float64Array.from({ length: n }, () => R.normal());
-    const xs = new Float64Array(n), res = { nf: { use: new Array(16).fill(0), se: 0 }, i4: { use: new Array(16).fill(0), se: 0 } };
-    for (let b0 = 0; b0 < n; b0 += B) {
-      let c = 0; for (let i = b0; i < Math.min(n, b0 + B); i++) c = Math.max(c, Math.abs(w[i]));
-      for (let i = b0; i < Math.min(n, b0 + B); i++) {
-        const x = w[i] / c; xs[i] = x;
-        const a = quantize(NF4, x), b = quantize(INT4, x);
-        res.nf.use[a]++; res.i4.use[b]++;
-        res.nf.se += (w[i] - c * NF4[a]) ** 2; res.i4.se += (w[i] - c * INT4[b]) ** 2;
-      }
-    }
-    ['nf', 'i4'].forEach((k) => { res[k].mse = res[k].se / n; res[k].use = res[k].use.map((u) => u / n); res[k].H = -M.sum(res[k].use.map((p) => (p > 0 ? p * Math.log2(p) : 0))); });
-    res.xs = xs; QR = res;
-  }
-  LAB.slider('#q-block', { label: '量化块大小', min: 0, max: BLOCKS.length - 1, step: 1, value: BLOCKS.indexOf(Q3.block), fmt: (v) => String(BLOCKS[v]), onInput: (v) => { Q3.block = BLOCKS[v]; upd3(); } });
-  LAB.slider('#q-n', { label: '权重个数（$w\\sim\\mathcal N(0,1)$）', min: 0, max: NS.length - 1, step: 1, value: 1, fmt: (v) => NS[v].toLocaleString(), onInput: (v) => { Q3.n = NS[v]; upd3(); } });
-  $('#q-resample').onclick = () => { Q3.seed++; upd3(); };
-  LAB.segmented('#q-model', ['7B', '13B', '70B'], 0, (i) => { Q3.model = i; memCv3.redraw(); });
-  LAB.checkbox('#q-dq', '双重量化（缩放常数再量化成 8 比特）', false, (v) => { Q3.dq = v; memCv3.redraw(); });
-  const histCv = LAB.canvas('#q-hist', (ctx, w, h) => {
-    const nb = 80, cnt = new Array(nb).fill(0);
-    QR.xs.forEach((x) => { cnt[Math.min(nb - 1, Math.floor(((x + 1) / 2) * nb))]++; });
-    const dens = cnt.map((c) => c / QR.xs.length / (2 / nb)), ymax = Math.max(...dens) * 1.15;
-    const P = new LAB.Plot(ctx, w, h, { xmin: -1.05, xmax: 1.05, ymin: 0, ymax, xtickValues: [-1, -0.5, 0, 0.5, 1], xlabel: '块内缩放后的权重 w / c', ylabel: '密度', pad: { l: 44, r: 12, t: 12, b: 50 } }).axes();
-    P.bars(M.range(nb).map((i) => -1 + (2 * (i + 0.5)) / nb), dens, '#cfd6de', (P.tx(2 / nb) - P.tx(0)) * 0.92);
-    const mid = (P.y0 + P.y1) / 2;
-    ctx.save(); ctx.lineWidth = 1.6;
-    NF4.forEach((q) => { ctx.strokeStyle = C.c6; ctx.beginPath(); ctx.moveTo(P.tx(q), P.y1); ctx.lineTo(P.tx(q), mid); ctx.stroke(); ctx.fillStyle = C.c6; ctx.beginPath(); ctx.arc(P.tx(q), P.y0 + 22, 3, 0, 7); ctx.fill(); });
-    INT4.forEach((q) => { ctx.strokeStyle = C.c2; ctx.beginPath(); ctx.moveTo(P.tx(q), mid); ctx.lineTo(P.tx(q), P.y0); ctx.stroke(); ctx.fillStyle = C.c2; ctx.beginPath(); ctx.arc(P.tx(q), P.y0 + 30, 3, 0, 7); ctx.fill(); });
-    ctx.fillStyle = C.c6; ctx.font = '600 11px Avenir Next, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText('NF4', P.x0 + 4, P.y1 + 10);
-    ctx.fillStyle = C.c2; ctx.fillText('INT4', P.x0 + 4, mid + 10);
-    ctx.restore();
-  });
-  const useCv = LAB.canvas('#q-use', (ctx, w, h) => {
-    const ymax = Math.max(...QR.nf.use, ...QR.i4.use) * 1.15;
-    const P = new LAB.Plot(ctx, w, h, { xmin: -0.7, xmax: 15.7, ymin: 0, ymax, xtickValues: [0, 3, 6, 9, 12, 15], yfmt: (v) => +(v * 100).toFixed(1) + '%', xlabel: '刻度编号（从 −1 到 +1）', pad: { l: 46, r: 10, t: 12, b: 36 } }).axes();
-    const bw = (P.tx(1) - P.tx(0)) * 0.36, dx = P.ix(P.tx(0) + bw * 0.55) - P.ix(P.tx(0));
-    P.bars(M.range(16).map((k) => k - dx), QR.nf.use, C.c6, bw);
-    P.bars(M.range(16).map((k) => k + dx), QR.i4.use, C.c2, bw);
-    P.hline(1 / 16, C.slate, [4, 4]);
-  });
-  const SIZES = [6.74e9, 13.0e9, 69.0e9];
-  const memCv3 = LAB.canvas('#q-mem', (ctx, w, h) => {
-    const Pn = SIZES[Q3.model], B = Q3.block;
-    const constBits = Q3.dq ? 8 / B + 32 / (B * 256) : 32 / B;
-    const rows = [['BF16', [[Pn * 2, C.slate]]], ['INT4 / NF4', [[Pn * 0.5, C.c6], [(Pn * constBits) / 8, C.c4]]]];
-    const tot = rows.map((r) => M.sum(r[1].map((s) => s[0]))), mx = tot[0];
-    const l = 86, rpad = 64, bh = 34;
-    rows.forEach(([name, segs], q) => {
-      const y = 22 + q * 70;
-      ctx.fillStyle = C.ink; ctx.font = '12.5px PingFang SC, sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(name, l - 10, y + bh / 2);
-      let x = l; segs.forEach(([v, col]) => { const ww = (v / mx) * (w - l - rpad); ctx.fillStyle = col; ctx.fillRect(x, y, ww, bh); x += ww; });
-      ctx.fillStyle = C.navy; ctx.font = '600 13px Avenir Next, sans-serif'; ctx.textAlign = 'left'; ctx.fillText(gb(tot[q]), x + 6, y + bh / 2);
-    });
-    ctx.fillStyle = C.slate; ctx.font = '12px PingFang SC, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    const y = 22 + 2 * 70 - 6;
-    ctx.fillText(`每参数 4 + ${constBits.toFixed(3)} 比特（块大小 ${B}）`, 12, y);
-    ctx.fillStyle = C.c4; ctx.fillText(`其中缩放常数共 ${gb((Pn * constBits) / 8)}`, 12, y + 20);
-  });
-  const q1 = LAB.stat('#q-stats', 'NF4 均方误差', 'teal');
-  const q2 = LAB.stat('#q-stats', 'INT4 均方误差', 'amber');
-  const q3 = LAB.stat('#q-stats', 'INT4 / NF4 误差比', 'coral');
-  const q4 = LAB.stat('#q-stats', 'NF4 刻度熵', 'teal');
-  const q5 = LAB.stat('#q-stats', 'INT4 刻度熵', 'amber');
-  function upd3() {
-    run3();
-    q1.set(fe(QR.nf.mse) + '<small>σ²</small>'); q2.set(fe(QR.i4.mse) + '<small>σ²</small>'); q3.set((QR.i4.mse / QR.nf.mse).toFixed(2) + '<small>×</small>');
-    q4.set(QR.nf.H.toFixed(2) + '<small>bit</small>'); q5.set(QR.i4.H.toFixed(2) + '<small>bit</small>');
-    histCv.redraw(); useCv.redraw(); memCv3.redraw();
-  }
-  upd3();
-
-  // DoRA：二维示意
-  const DO = { w0: [1.5, 0.7], v: [1.2, 1.5], m: Math.hypot(1.5, 0.7), P: null, drag: false };
-  const doraCv = LAB.canvas('#q-dora', (ctx, w, h) => {
-    const P = new LAB.Plot(ctx, w, h, { xmin: -2.6, xmax: 2.6, ymin: -2.6, ymax: 2.6, xticks: 4, yticks: 4, pad: { l: 28, r: 10, t: 10, b: 26 } }).axes();
-    DO.P = P;
-    const px = (p) => [P.tx(p[0]), P.ty(p[1])], nv = Math.hypot(...DO.v) || 1e-9, out = DO.v.map((x) => (DO.m * x) / nv);
-    ctx.save(); ctx.strokeStyle = 'rgba(47,143,91,.4)'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(P.tx(0), P.ty(0), P.tx(DO.m) - P.tx(0), 0, 7); ctx.stroke(); ctx.restore();
-    LAB.arrow(ctx, ...px([0, 0]), ...px(DO.w0), C.slate, 2.4);
-    LAB.arrow(ctx, ...px([0, 0]), ...px(DO.v), C.c5, 1.8);
-    LAB.arrow(ctx, ...px([0, 0]), ...px(out), C.c3, 3);
-    P.points([DO.v[0]], [DO.v[1]], C.c5, 7, '#fff');
-  });
-  const ds1 = LAB.stat('#q-dora-stats', '方向变化', 'plum');
-  const ds2 = LAB.stat('#q-dora-stats', 'LoRA 长度变化', 'coral');
-  const ds3 = LAB.stat('#q-dora-stats', 'DoRA 长度变化', 'leaf');
-  const mS = LAB.slider('#q-dora-m', { label: '模长 $m$', min: 0.3, max: 2.5, step: 0.01, value: DO.m, fmt: (v) => v.toFixed(2), onInput: (v) => { DO.m = v; updDora(); } });
-  function updDora() {
-    const n0 = Math.hypot(...DO.w0), nv = Math.hypot(...DO.v);
-    const ang = (Math.atan2(DO.v[1], DO.v[0]) - Math.atan2(DO.w0[1], DO.w0[0])) * 180 / Math.PI;
-    ds1.set(ang.toFixed(1) + '<small>°</small>'); ds2.set((nv - n0 >= 0 ? '+' : '') + (nv - n0).toFixed(2)); ds3.set((DO.m - n0 >= 0 ? '+' : '') + (DO.m - n0).toFixed(2));
-    doraCv.redraw();
-  }
-  const doraMove = (x, y) => { const P = DO.P; if (!P) return; const v = [M.clamp(P.ix(x), -2.5, 2.5), M.clamp(P.iy(y), -2.5, 2.5)]; if (Math.hypot(...v) > 0.2) { DO.v = v; updDora(); } };
-  (() => { const el = $('#q-dora'); let on = false; const pos = (e) => { const r = el.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
-    el.addEventListener('pointerdown', (e) => { on = true; try { el.setPointerCapture(e.pointerId); } catch (_) {} doraMove(...pos(e)); e.preventDefault(); });
-    el.addEventListener('pointermove', (e) => { if (on) doraMove(...pos(e)); });
-    el.addEventListener('pointerup', () => { on = false; }); el.addEventListener('pointercancel', () => { on = false; }); })();
-  updDora();
+  buildInit(); initTable();
+  $('#s-resample').addEventListener('click', () => { initSeed++; buildInit(); initTable(); });
 })();

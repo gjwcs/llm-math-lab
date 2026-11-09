@@ -1,7 +1,7 @@
-/* 第 13 章：连续生成模型的随机微积分：交互实验 */
+/* 第 13 章：去噪扩散模型（DDPM）、指路箭头（Score）与流匹配：交互实验 */
 (function () {
   const { COLORS: C, M } = LAB;
-  LAB.page({ bookRef: '对应书中 §13.2 前向扩散 · §13.3 得分与 Tweedie · §13.4 流匹配 · §13.5 CFG · §13.6 手算算例' });
+  LAB.page({ bookRef: '对应书中 §13.1 正向加雪花 · §13.2 猜雪花、指路箭头与 CFG · §13.3 流匹配 · 问 13.1 · 练习 13.1–13.2' });
 
   const $ = (s) => document.querySelector(s);
   const FONT = getComputedStyle(document.body).getPropertyValue('--font');
@@ -144,30 +144,40 @@
     if (t === 0) fs.snr.set('∞');
     cloud.redraw(); fcurve.redraw();
   }
-  // 书中手算：x0 = 10, β1 = 0.19, β2 = 17/81
+  // 书中手算：x0 = 10，两步都取 α = 0.9（ᾱ₂ = 0.81）
   const two = (() => {
     const R = LAB.rng(2024), n = 20000, a = [], b = [];
     for (let i = 0; i < n; i++) {
-      const x1 = 0.9 * 10 + Math.sqrt(0.19) * R.normal();
-      a.push((8 / 9) * x1 + (Math.sqrt(17) / 9) * R.normal());
-      b.push(0.8 * 10 + 0.6 * R.normal());
+      const x1 = Math.sqrt(0.9) * 10 + Math.sqrt(0.1) * R.normal();
+      a.push(Math.sqrt(0.9) * x1 + Math.sqrt(0.1) * R.normal());
+      b.push(0.9 * 10 + Math.sqrt(0.19) * R.normal());
     }
     return { a, b };
   })();
   const ms = (v) => { const m = M.mean(v); return [m, M.std(v)]; };
   const [ma, sa] = ms(two.a), [mb, sb] = ms(two.b);
-  $('#f-two-cap').innerHTML = `两步走：均值 <b>${ma.toFixed(3)}</b>，标准差 <b>${sa.toFixed(3)}</b>；一步跳：均值 <b>${mb.toFixed(3)}</b>，标准差 <b>${sb.toFixed(3)}</b>。理论合成方差 $\\frac{64\\times0.19+17}{81}=\\frac{29.16}{81}=0.36$，标准差 $0.6$。`;
+  $('#f-two-cap').innerHTML = `两步走：均值 <b>${ma.toFixed(3)}</b>，标准差 <b>${sa.toFixed(3)}</b>；一步跳：均值 <b>${mb.toFixed(3)}</b>，标准差 <b>${sb.toFixed(3)}</b>。理论合成方差 $0.9\\times0.1+0.1=0.19=1-0.81$，标准差 $\\sqrt{0.19}\\approx0.436$。`;
   LAB.renderMath($('#f-two-cap'));
   LAB.canvas('#f-two', (ctx, w, h) => {
-    const lo = 5.6, hi = 10.4, nb = 48, bw = (hi - lo) / nb;
+    const lo = 7.4, hi = 10.6, nb = 48, bw = (hi - lo) / nb;
     const hist = (v) => { const c = new Array(nb).fill(0); v.forEach((x) => { const k = Math.floor((x - lo) / bw); if (k >= 0 && k < nb) c[k]++; }); return c.map((x) => x / (v.length * bw)); };
     const ha = hist(two.a), hb = hist(two.b), xs = M.range(nb).map((k) => lo + (k + 0.5) * bw);
-    const P = new LAB.Plot(ctx, w, h, { xmin: lo, xmax: hi, ymin: 0, ymax: 0.75, xlabel: 'x₂', ylabel: '密度', yticks: 3, pad: { l: 42, r: 10, t: 10, b: 38 } }).axes();
+    const P = new LAB.Plot(ctx, w, h, { xmin: lo, xmax: hi, ymin: 0, ymax: 1.05, xlabel: 'x₂', ylabel: '密度', yticks: 3, pad: { l: 42, r: 10, t: 10, b: 38 } }).axes();
     ctx.save(); ctx.globalAlpha = 0.55; P.bars(xs, ha, C.c2, (P.tx(bw) - P.tx(0)) * 0.92); ctx.restore();
     const stepX = [], stepY = []; xs.forEach((x, k) => { stepX.push(x - bw / 2, x + bw / 2); stepY.push(hb[k], hb[k]); });
     P.line(stepX, stepY, C.c6, 2);
-    P.fn((x) => Math.exp(-((x - 8) ** 2) / (2 * 0.36)) / Math.sqrt(2 * Math.PI * 0.36), C.navy, 1.8, [5, 3]);
+    P.fn((x) => Math.exp(-((x - 9) ** 2) / (2 * 0.19)) / Math.sqrt(2 * Math.PI * 0.19), C.navy, 1.8, [5, 3]);
   });
+  // 再算一个像素：x_t = sqrt(ᾱ)·10 + sqrt(1-ᾱ)·ε（书中 ᾱ = 0.64，ε = 2.0 → 9.2）
+  const fc = { ab: null, e: null };
+  const fcs = { a: LAB.stat('#f-calc-stats', '$\\sqrt{\\bar\\alpha_t}$', 'teal'), b: LAB.stat('#f-calc-stats', '$\\sqrt{1-\\bar\\alpha_t}$', 'coral'), x: LAB.stat('#f-calc-stats', '$x_t=\\sqrt{\\bar\\alpha_t}\\cdot10+\\sqrt{1-\\bar\\alpha_t}\\,\\epsilon$', 'amber') };
+  function updCalc() {
+    const ab = fc.ab.get(), e = fc.e.get(), a = Math.sqrt(ab), b = Math.sqrt(1 - ab);
+    fcs.a.set(a.toFixed(3)); fcs.b.set(b.toFixed(3)); fcs.x.set((a * 10 + b * e).toFixed(3));
+  }
+  fc.ab = LAB.slider('#f-calc', { label: '累计保留系数 $\\bar\\alpha_t$', min: 0.01, max: 0.99, step: 0.01, value: 0.64, fmt: (v) => v.toFixed(2), onInput: updCalc });
+  fc.e = LAB.slider('#f-calc', { label: '雪花 $\\epsilon$', min: -3, max: 3, step: 0.1, value: 2, fmt: (v) => (v > 0 ? '+' : '') + v.toFixed(1), onInput: updCalc });
+  updCalc();
   update1();
 
   /* ================= 实验 2：得分场与反向去噪 ================= */
@@ -285,8 +295,31 @@
     field.redraw();
   }
   drawR();
+  // 书中手算：x_t = 9.2，网络猜雪花 ε̂ → x̂0 = (9.2 − 0.6 ε̂)/0.8（书中 ε̂ = 1.95 → 10.0375）
+  const rcs = { x: LAB.stat('#r-calc-stats', '还原 $\\hat x_0=\\dfrac{9.2-0.6\\,\\hat\\epsilon_\\theta}{0.8}$', 'teal'), d: LAB.stat('#r-calc-stats', '与真值 $10$ 的差', 'coral'), s: LAB.stat('#r-calc-stats', '指路箭头 $-\\hat\\epsilon_\\theta/0.6$', 'plum') };
+  const rEh = LAB.slider('#r-calc', { label: '网络猜出的雪花 $\\hat\\epsilon_\\theta$', min: -1, max: 4, step: 0.01, value: 1.95, fmt: (v) => v.toFixed(2), onInput: updR });
+  function updR() { const e = rEh.get(), x0 = (9.2 - 0.6 * e) / 0.8; rcs.x.set(x0.toFixed(4)); rcs.d.set((x0 - 10 >= 0 ? '+' : '') + (x0 - 10).toFixed(4)); rcs.s.set((-e / 0.6).toFixed(3)); }
+  updR();
 
   /* ================= 实验 3：流匹配 vs 扩散 + CFG ================= */
+  // 书中手算：一维直线滑梯 x_t = (1-t)·2 + t·10，速度恒为 8；问 13.1 的两条训练直线在 t = 1/6、x = 0 交叉
+  const sT = LAB.slider('#s-t', { label: '时间 $t$', min: 0, max: 1, step: 0.01, value: 0.5, fmt: (v) => v.toFixed(2), onInput: () => { sPlot.redraw(); updS(); } });
+  const ss = { x: LAB.stat('#s-stats', '位置 $x_t=(1-t)\\cdot2+t\\cdot10$', 'teal'), v: LAB.stat('#s-stats', '速度 $v_t=x_1-\\epsilon$', 'amber'), e: LAB.stat('#s-stats', '一步欧拉 $2+1\\times8$', 'leaf'), c: LAB.stat('#s-stats', '训练直线交叉口 $(t,x)$', 'coral') };
+  function updS() { const t = sT.get(); ss.x.set((2 + 8 * t).toFixed(2)); ss.v.set('8'); ss.e.set('10'); ss.c.set('(1/6, 0)'); }
+  const sPlot = LAB.canvas('#s-plot', (ctx, w, h) => {
+    const P = new LAB.Plot(ctx, w, h, { xmin: 0, xmax: 1, ymin: -11, ymax: 11, xlabel: '时间 t', ylabel: '像素 x', xtickValues: [0, 0.25, 0.5, 0.75, 1], ytickValues: [-10, -5, 0, 2, 5, 10], pad: { l: 42, r: 12, t: 10, b: 38 } }).axes();
+    P.line([0, 1], [-2, 10], C.c4, 1.6, [6, 4]);
+    P.line([0, 1], [2, -10], C.c1, 1.6, [6, 4]);
+    P.line([0, 1], [2, 10], C.c6, 3);
+    P.points([0, 0.25, 0.5, 0.75, 1], [2, 4, 6, 8, 10], C.c6, 3.5, '#fff');
+    ctx.save(); ctx.strokeStyle = C.amber; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(P.tx(1 / 6), P.ty(0), 7, 0, 6.2832); ctx.stroke(); ctx.restore();
+    const t = sT.get();
+    P.vline(t, C.amber, [4, 3], 1.2);
+    P.points([t], [2 + 8 * t], C.navy, 6, '#fff');
+    P.text(t + (t > 0.7 ? -0.02 : 0.02), 2 + 8 * t - 1.6, `x = ${(2 + 8 * t).toFixed(2)}`, C.navy, t > 0.7 ? 'right' : 'left', 'middle', NUM);
+  });
+  updS();
+
   const G3 = makeShape('moons'), N3 = 260, NT3 = 26;
   const BMIN = 0.1, BMAX = 20, abC = (t) => Math.exp(-(BMIN * t + 0.5 * (BMAX - BMIN) * t * t)), betaC = (t) => BMIN + t * (BMAX - BMIN);
   const v3 = new Float64Array(2), v3b = new Float64Array(2);
@@ -321,11 +354,12 @@
   const optPairs = LAB.checkbox('#fm-opts', '显示训练用的直线配对（右图）', false, () => d3b.redraw());
   let cfgCls = 0;
   LAB.segmented('#cfg-cls', ['上月牙', '下月牙'], 0, (i) => { cfgCls = i; sched3(true); });
-  const cfgW = LAB.slider('#cfg-w', { label: '引导强度 $w$', min: 0, max: 8, step: 0.1, value: 3, fmt: (v) => v.toFixed(1), onInput: () => sched3(true) });
+  const cfgW = LAB.slider('#cfg-w', { label: '引导强度 $w$', min: 0, max: 8, step: 0.1, value: 5, fmt: (v) => v.toFixed(1), onInput: () => sched3(true) });
   $('#fm-reseed').onclick = () => { seed3++; makeNoise(); sched3(); };
   const st3 = { fm: LAB.stat('#fm-stats', '流匹配：平均距离', 'leaf'), pf: LAB.stat('#fm-stats', '扩散：平均距离', 'coral'), nfm: LAB.stat('#fm-stats', '流匹配达标步数', 'teal'), npf: LAB.stat('#fm-stats', '扩散达标步数', 'amber') };
-  const stc = { hit: LAB.stat('#cfg-stats', '落在目标类的比例', 'leaf'), d: LAB.stat('#cfg-stats', '离数据平均距离', 'coral'), sp: LAB.stat('#cfg-stats', '样本散布（标准差）', 'plum') };
-  // 训练配对（右图虚线）：随机 x0 ~ 数据，x1 ~ 噪声
+  const stc = { hit: LAB.stat('#cfg-stats', '落在目标类的比例', 'leaf'), d: LAB.stat('#cfg-stats', '离数据平均距离', 'coral'), sp: LAB.stat('#cfg-stats', '样本散布（标准差）', 'plum'), book: LAB.stat('#cfg-stats', '书中手算 $-1.0+w\times(-0.4)$', 'amber') };
+  // 训练配对（右图虚线）。注意：本段代码内部沿用“x0 = 数据、x1 = 噪声、从 t=1 积分到 0”的写法，
+  // 与书中“t=0 雪花、t=1 清晰图、从 0 积分到 1”只差 t ↔ 1−t 的换名，生成的轨迹完全相同。
   const pairs = (() => { const R = LAB.rng(9), a = []; for (let i = 0; i < 26; i++) { const k = R.int(G3.K); a.push([G3.cx[k] + G3.s0 * R.normal(), G3.cy[k] + G3.s0 * R.normal(), R.normal(), R.normal()]); } return a; })();
   const dataPts = (() => { const R = LAB.rng(3), x = [], y = [], c = []; for (let i = 0; i < 500; i++) { const k = R.int(G3.K); x.push(G3.cx[k] + G3.s0 * R.normal()); y.push(G3.cy[k] + G3.s0 * R.normal()); c.push(G3.c[k].col); } return { x, y, c }; })();
   function drawPanel(ctx, w, h, kind) {
@@ -366,6 +400,7 @@
     for (let i = 0; i < n; i++) { let m = Infinity, cl = 0; for (let k = 0; k < G3.K; k++) { const d = (x[i] - G3.cx[k]) ** 2 + (y[i] - G3.cy[k]) ** 2; if (d < m) { m = d; cl = G3.cls[k]; } } if (cl === cfgCls) hit++; col.push(cl === 0 ? C.c1 : C.c2); }
     const sp = Math.sqrt((M.std(Array.from(x)) ** 2 + M.std(Array.from(y)) ** 2));
     cfgRes = { x, y, col };
+    stc.book.set((-1.0 + w * -0.4).toFixed(2));
     stc.hit.set(`${(hit / n * 100).toFixed(0)}<small>%</small>`); stc.d.set(nearestDist(G3, x, y).toFixed(3)); stc.sp.set(sp.toFixed(3));
     cfgCanvas.redraw();
   }

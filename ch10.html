@@ -5,17 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>第 10 章 · 在线实验室</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="assets/lab.css">
+<link rel="stylesheet" href="assets/lab.css?v=20261110">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-<script defer src="assets/lab.js"></script>
+<script defer src="assets/lab.js?v=20261110"></script>
 <script defer src="ch10.js"></script>
 </head>
 <body data-chapter="10">
 <main class="container">
 
   <!-- ========================= 实验 1 ========================= -->
-  <section class="experiment" id="chinchilla" data-title="Chinchilla 计算器">
+  <section class="experiment" id="chinchilla" data-title="算力预算分配器">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">1</span>给定算力，怎么分？</div>
@@ -48,8 +48,9 @@
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>点“书中算例”并切到“书中手算常数”：经验法则 $D=20N$ 给出 $N\approx7.07\text{B}$、$D\approx141.4\text{B}$；而 $\alpha=\beta,\ A=B$ 时解析最优恰好是 $N=D$。</li>
-            <li>切回 Chinchilla 拟合常数：解析最优的 $D/N$ 并不是 20。但看损失剖面，谷底非常平，按 20 倍分配只多付千分之几的损失。</li>
+            <li>点“书中算例”：经验法则 $D=20N$ 给出 $N\approx7.07\text{B}$、$D\approx141.4\text{B}$，与 10.3 节手算一致。</li>
+            <li>保持“Chinchilla 拟合”常数：解析最优的 $D/N$ 约为 60，并不是 20；但看损失剖面，谷底非常平，按 20 倍分配只多 $0.007$ 左右。</li>
+            <li>切到“Epoch AI 重新拟合”：两个指数几乎相等（$\alpha\approx0.35$、$\beta\approx0.37$），解析最优的 $D/N$ 回到 20 左右。</li>
             <li>把算力从 $10^{20}$ 拖到 $10^{25}$：最优点沿紫色轨迹移动，每 10 倍算力 $N$ 与 $D$ 各涨约 $3$ 倍。</li>
             <li>在地图上点 GPT-3 式的分配（大 $N$、小 $D$）：同样的算力，损失明显更高，这就是“营养不良”。</li>
           </ol>
@@ -59,43 +60,44 @@
   </section>
 
   <!-- ========================= 实验 2 ========================= -->
-  <section class="experiment" id="emergence" data-title="平滑的损失与陡峭的涌现">
+  <section class="experiment" id="share" data-title="旋钮平分与临界爆炸">
     <div class="lab-grid">
       <div class="card controls">
-        <div class="card-title"><span class="dot">2</span>K 步全对才得分</div>
-        <div id="e-K"></div>
-        <div id="e-eps"></div>
-        <div id="e-alpha"></div>
-        <div id="e-ntest"></div>
-        <div id="e-log"></div>
-        <div class="btn-row"><button class="btn ghost" id="e-resample">重新抽一次测试集</button></div>
-        <div class="caption">在任务准确率图上点按可以选一个模型规模 $N$。</div>
+        <div class="card-title"><span class="dot">2</span>一道题、$N$ 个旋钮</div>
+        <div id="s-N"></div>
+        <div id="s-y"></div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <div class="small" style="font-weight:650;color:var(--navy)">两道几乎一样的题、2 个旋钮</div>
+        <div id="s-eps"></div>
+        <div id="s-b2"></div>
+        <div class="btn-row"><button class="btn ghost" id="s-book">恢复书中数值</button></div>
       </div>
       <div class="stack">
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c1)">ℓ</span>单步损失随规模平滑下降<span class="sub">双对数坐标</span></div>
-          <div class="viz h260" id="e-loss"></div>
-          <div class="legend"><span><i style="background:var(--c1)"></i>单步损失 $\ell(N)=\varepsilon+AN^{-\alpha}$</span><span><i style="background:var(--c3)"></i>单步正确率 $p=e^{-\ell}$（右轴）</span></div>
+          <div class="card-title"><span class="dot" style="background:var(--c1)">Σ</span>平分任务：旋钮越多，平方和越小<span class="sub">双对数坐标</span></div>
+          <div class="viz h260" id="s-curve"></div>
+          <div class="legend"><span><i style="background:var(--c1)"></i>最小平方和 $y^2/N$</span><span><i style="background:var(--amber);height:8px;width:8px;border-radius:50%"></i>书中算过的 $N=1,2,100$</span><span><i style="background:var(--coral);height:8px;width:8px;border-radius:50%"></i>当前 $N$</span></div>
         </div>
+        <div class="stats" id="s-stats"></div>
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c4)">K</span>任务准确率 $p^K$：“涌现”出现了</div>
-          <div class="viz h300" id="e-acc" style="touch-action:none; cursor:crosshair"></div>
-          <div class="legend"><span><i style="background:var(--c4)"></i>全对才得分 $p^K$</span><span><i style="background:var(--c3)"></i>平滑指标：逐步正确率 $p$</span><span><i style="background:#cfd6de"></i>其他 $K$</span><span><i style="background:var(--navy);height:8px;width:8px;border-radius:50%"></i>有限测试集上的实测值</span></div>
+          <div class="card-title"><span class="dot" style="background:var(--c4)">✕</span>临界插值：两条几乎重合的直线交在哪里？</div>
+          <div class="viz h300" id="s-lines"></div>
+          <div class="legend"><span><i style="background:var(--c4)"></i>第 1 题 $w_1+w_2=2$</span><span><i style="background:var(--c1)"></i>第 2 题 $w_1+(1+\varepsilon)w_2=2+\varepsilon+\delta$</span><span><i style="background:var(--leaf);height:8px;width:8px;border-radius:50%"></i>健康解 $(1,1)$</span><span><i style="background:var(--navy);height:8px;width:8px;border-radius:50%"></i>硬解出来的交点</span></div>
         </div>
-        <div class="stats" id="e-stats"></div>
+        <div class="stats" id="s-stats2"></div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-          <div class="formula">$$p_{\text{token}}(N) = \exp\!\big(-\ell(N)\big),\qquad \operatorname{Acc}_{\text{task}}(N, K) = \big[p_{\text{token}}(N)\big]^K = \exp\!\big(-K \cdot \ell(N)\big)$$</div>
-          <p class="small muted">书中写作 $p=\exp(-E-AN^{-\alpha})$；这里把不可约项换成任务自身的小误差 $\varepsilon$（否则 $e^{-1.69}\approx0.18$，单步正确率太低）。$A=406.4$ 取自 Chinchilla 拟合。临界规模 $N_{\text{crit}}\approx(KA)^{1/\alpha}$ 处 $K\ell\approx1$，准确率约 $e^{-1}$。</p>
-          <div style="overflow-x:auto"><table class="data" id="e-table"></table></div>
+          <div class="formula">$$w_1+\dots+w_N=y\ \Longrightarrow\ w_i^*=\frac{y}{N},\qquad \|\mathbf w^*\|^2=N\Big(\frac{y}{N}\Big)^2=\frac{y^2}{N}$$</div>
+          <div class="formula">$$\begin{cases}w_1+w_2=2\\ w_1+(1+\varepsilon)\,w_2=2+\varepsilon+\delta\end{cases}\Longrightarrow\ w_2=1+\frac{\delta}{\varepsilon},\quad w_1=1-\frac{\delta}{\varepsilon}$$</div>
+          <p class="small muted" style="margin-bottom:0">不印错（$\delta=0$）时解就是健康的 $(1,1)$。两道题越像（$\varepsilon$ 越小），系数矩阵的最小奇异值 $\sigma_{\min}$ 越接近 0，第 2 题里一点点印错 $\delta$ 就被放大约 $1/\sigma_{\min}$ 倍。旋钮数恰好等于题目数时，只有这一个解可选，模型只能硬吞下这个放大。</p>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>把 $K$ 从 1 拉到 50：单步损失曲线一点没变，任务准确率却从缓坡变成悬崖，临界规模往右移。</li>
-            <li>勾选“纵轴取对数”：$\ln\operatorname{Acc}=-K\ell(N)$ 又变回平滑曲线，涌现的“突变”来自指标，而不是模型。</li>
-            <li>把测试集调到 100 题：小模型的实测准确率全是 0，看起来像“完全不会”，其实只是分辨率不够。</li>
-            <li>对照表复现书中数字：$K=50$ 时 $0.85^{50}\approx0.03\%$、$0.99^{50}\approx60.5\%$。</li>
+            <li>把 $N$ 拖到 1、2、100：平方和依次是 $4$、$2$、$0.04$，正是 10.1 节算过的三个数；拖到 1000 只剩 $0.004$。</li>
+            <li>恢复书中数值：$\varepsilon=0.001$，第 2 题的真实答案 $2.001$ 被印成 $2.1$（印错 $\delta=0.099$），交点被推到 $(-98,100)$，平方和 $19604$。</li>
+            <li>把印错量 $\delta$ 拖到 0：交点立刻回到 $(1,1)$，平方和回到 $2$。</li>
+            <li>把 $\varepsilon$ 从 $0.001$ 调到 $0.1$：两道题不再那么像，同样印错 $0.1$，交点只跑到 $(0,2)$ 附近。</li>
           </ol>
         </div>
       </div>
@@ -103,7 +105,7 @@
   </section>
 
   <!-- ========================= 实验 3 ========================= -->
-  <section class="experiment" id="double-descent" data-title="双下降">
+  <section class="experiment" id="double-descent" data-title="双下降曲线">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">3</span>随机特征岭回归</div>
@@ -134,7 +136,9 @@
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>默认 $p=8n$：训练误差已经是 0，噪声被高频小振幅特征就地吸收成细碎的抖动，主体曲线贴着真实函数，测试误差比经典区的最佳点（约 $p\approx0.4n$）还低。</li>
+            <li>默认是书中的 10 道题（$n=10$），$p=8n=80$：训练误差已经是 0，噪声被高频小振幅特征就地吸收成细碎的抖动，主体曲线贴着真实函数，测试误差比 $p$ 很小时还低，这就是三号考生。</li>
+            <li>把 $p$ 拖到 3（一号考生）和 10（二号考生）：前者测试误差中等，后者刚好卡在插值阈值，测试误差冲上尖峰。</li>
+            <li>把 $n$ 调到 40：经典区出现一个更明显的 U 形谷底（约 $p\approx0.4n$），尖峰仍在 $p=n$。</li>
             <li>把 $p$ 拖到 $n$ 附近：曲线为了穿过每个噪声点剧烈振荡，系数范数 $\|\hat{\boldsymbol\theta}\|$ 暴涨，测试误差冲上尖峰。</li>
             <li>把 $\lambda$ 从 $10^{-9}$ 加到 $10^{-2}$：尖峰被削平，代价是训练误差不再为 0。</li>
             <li>把噪声 $\sigma$ 调成 0：尖峰大幅降低。尖峰主要来自“硬穿过噪声”。</li>

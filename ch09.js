@@ -1,7 +1,7 @@
 /* 第 9 章：非凸优化的导航仪：交互实验 */
 (function () {
   const { COLORS: C, M } = LAB;
-  LAB.page({ bookRef: '对应书中 §9.2 AdamW 与“L2 ≠ 权重衰减” · §9.3 Warmup + 余弦退火 · §9.5 手算算例 · 峡谷地形图' });
+  LAB.page({ bookRef: '对应书中 §9.1 窄山谷与动量手算 · §9.2 Adam 偏差校正与 AdamW · §9.3 预热 + 余弦退火 · §9.4 全流程手算算例' });
 
   const $ = (s) => document.querySelector(s);
   const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
@@ -33,21 +33,21 @@
   /* ================= 实验 1：地形赛跑 ================= */
   const wellsF = (x, y) => -2 * Math.exp(-((x - 1.5) ** 2 + (y - 1) ** 2) / 0.8) - 1.4 * Math.exp(-((x + 1.6) ** 2 + (y + 0.8) ** 2) / 1.0) - 1.0 * Math.exp(-((x + 0.5) ** 2 + (y - 1.6) ** 2) / 0.3) + 0.06 * (x * x + y * y);
   const LANDS = [
-    { name: '峡谷', tex: '\\mathcal L=0.12\\theta_1^2+2.2\\theta_2^2', f: (x, y) => 0.12 * x * x + 2.2 * y * y, g: (x, y) => [0.24 * x, 4.4 * y], dom: [-6, 6, -3, 3], start: [-5, 2.5], mins: [[0, 0]], steps: 150, lr: [0.43, 0.43, 0.3, 0.3], lam: 0.05 },
-    { name: '鞍点', tex: '\\mathcal L=\\tfrac12\\theta_1^2-\\tfrac12\\theta_2^2+\\tfrac14\\theta_2^4', f: (x, y) => 0.5 * x * x - 0.5 * y * y + 0.25 * y ** 4, g: (x, y) => [x, -y + y ** 3], dom: [-3, 3, -1.6, 1.6], start: [-2.8, 0.0005], mins: [[0, 1], [0, -1]], steps: 300, lr: [0.1, 0.8, 0.05, 0.05], lam: 0.05, snap: true },
-    { name: '香蕉谷', tex: '\\mathcal L=(1-\\theta_1)^2+100(\\theta_2-\\theta_1^2)^2', f: (x, y) => (1 - x) ** 2 + 100 * (y - x * x) ** 2, g: (x, y) => [-2 * (1 - x) - 400 * x * (y - x * x), 200 * (y - x * x)], dom: [-2, 2, -1, 3], start: [-1.2, 1], mins: [[1, 1]], steps: 1000, lr: [0.002, 0.02, 0.1, 0.1], lam: 0.02 },
-    { name: '多井', tex: '\\mathcal L=-\\textstyle\\sum_{j=1}^3 a_je^{-\\|\\boldsymbol\\theta-\\mathbf c_j\\|^2/s_j}+0.06\\|\\boldsymbol\\theta\\|^2', f: wellsF, g: (x, y) => { const h = 1e-5; return [(wellsF(x + h, y) - wellsF(x - h, y)) / (2 * h), (wellsF(x, y + h) - wellsF(x, y - h)) / (2 * h)]; }, dom: [-3, 3, -3, 3], start: [-2.5, 2.5], mins: null, steps: 400, lr: [0.2, 1.5, 0.05, 0.05], lam: 0.05 },
+    { name: '窄山谷', tex: 'f(x,y)=x^2+25y^2', f: (x, y) => x * x + 25 * y * y, g: (x, y) => [2 * x, 50 * y], dom: [-3, 11, -1.6, 1.6], start: [10, 1], mins: [[0, 0]], steps: 60, lr: [0.035, 0.035, 1.0, 1.0], beta: 0.5, lam: 0.1, book: true },
+    { name: '鞍点', tex: 'f=\\tfrac12x^2-\\tfrac12y^2+\\tfrac14y^4', f: (x, y) => 0.5 * x * x - 0.5 * y * y + 0.25 * y ** 4, g: (x, y) => [x, -y + y ** 3], dom: [-3, 3, -1.6, 1.6], start: [-2.8, 0.0005], mins: [[0, 1], [0, -1]], steps: 300, lr: [0.1, 0.08, 0.05, 0.05], beta: 0.9, lam: 0.05, snap: true },
+    { name: '香蕉谷', tex: 'f=(1-x)^2+100(y-x^2)^2', f: (x, y) => (1 - x) ** 2 + 100 * (y - x * x) ** 2, g: (x, y) => [-2 * (1 - x) - 400 * x * (y - x * x), 200 * (y - x * x)], dom: [-2, 2, -1, 3], start: [-1.2, 1], mins: [[1, 1]], steps: 1000, lr: [0.002, 0.002, 0.1, 0.1], beta: 0.9, lam: 0.02 },
+    { name: '多井', tex: 'f=-\\textstyle\\sum_{j=1}^3 a_je^{-\\|(x,y)-\\mathbf c_j\\|^2/s_j}+0.06(x^2+y^2)', f: wellsF, g: (x, y) => { const h = 1e-5; return [(wellsF(x + h, y) - wellsF(x - h, y)) / (2 * h), (wellsF(x, y + h) - wellsF(x, y - h)) / (2 * h)]; }, dom: [-3, 3, -3, 3], start: [-2.5, 2.5], mins: null, steps: 400, lr: [0.2, 0.15, 0.05, 0.05], beta: 0.9, lam: 0.05 },
   ];
   // 多井地形的全局最小值：网格搜索 + 梯度下降精修
   { const Ld = LANDS[3]; let best = [0, 0], bv = Infinity; for (let i = 0; i <= 120; i++) for (let j = 0; j <= 120; j++) { const x = -3 + i / 20, y = -3 + j / 20, v = Ld.f(x, y); if (v < bv) { bv = v; best = [x, y]; } } for (let k = 0; k < 2000; k++) { const g = Ld.g(...best); best = [best[0] - 0.05 * g[0], best[1] - 0.05 * g[1]]; } Ld.mins = [best]; }
   LANDS.forEach((Ld) => { Ld.fmin = Math.min(...Ld.mins.map((m) => Ld.f(...m))); });
   const OPTS = [
     { key: 'sgd', name: 'SGD', color: C.c4, range: [-4, 0], cls: 'coral' },
-    { key: 'mom', name: 'Momentum', color: C.c2, range: [-3, 1.3], cls: 'amber' },
+    { key: 'mom', name: '动量法', color: C.c2, range: [-4, 0.5], cls: 'amber' },
     { key: 'adam', name: 'Adam', color: C.c1, range: [-3.5, 0], cls: '' },
     { key: 'adamw', name: 'AdamW', color: C.c3, range: [-3.5, 0], cls: 'leaf' },
   ];
-  const O = { land: 0, start: LANDS[0].start.slice(), lr: LANDS[0].lr.slice(), on: [true, true, true, true], lam: LANDS[0].lam, noise: false, sigma: 0.3, speed: 2, running: false, t: 0 };
+  const O = { land: 0, start: LANDS[0].start.slice(), lr: LANDS[0].lr.slice(), on: [true, true, true, true], beta: LANDS[0].beta, lam: LANDS[0].lam, noise: false, sigma: 0.3, speed: 1, running: false, t: 0 };
   let racers = [];
   function resetRacers() {
     O.t = 0;
@@ -64,7 +64,7 @@
       if (O.noise) g = [g[0] + O.sigma * r.R.normal(), g[1] + O.sigma * r.R.normal()];
       const lr = O.lr[i], key = OPTS[i].key;
       if (key === 'sgd') { r.x -= lr * g[0]; r.y -= lr * g[1]; }
-      else if (key === 'mom') { r.m = r.m.map((a, k) => b1 * a + (1 - b1) * g[k]); r.x -= lr * r.m[0]; r.y -= lr * r.m[1]; }
+      else if (key === 'mom') { r.m = r.m.map((a, k) => O.beta * a + g[k]); r.x -= lr * r.m[0]; r.y -= lr * r.m[1]; }
       else {
         r.m = r.m.map((a, k) => b1 * a + (1 - b1) * g[k]); r.v = r.v.map((a, k) => b2 * a + (1 - b2) * g[k] * g[k]);
         const u = r.m.map((a, k) => (a / (1 - Math.pow(b1, t))) / (Math.sqrt(r.v[k] / (1 - Math.pow(b2, t))) + eps));
@@ -76,7 +76,7 @@
     });
   }
   // 控件
-  LAB.segmented('#o-land', LANDS.map((l) => l.name), 0, (i) => { O.land = i; const Ld = LANDS[i]; O.start = Ld.start.slice(); O.lr = Ld.lr.slice(); O.lam = Ld.lam; lrSliders.forEach((s, k) => s.set(Math.log10(O.lr[k]))); lamS.set(O.lam); fieldCache = null; showFormula(); restart(true); });
+  LAB.segmented('#o-land', LANDS.map((l) => l.name), 0, (i) => { O.land = i; const Ld = LANDS[i]; O.start = Ld.start.slice(); O.lr = Ld.lr.slice(); O.lam = Ld.lam; O.beta = Ld.beta; lrSliders.forEach((s, k) => s.set(Math.log10(O.lr[k]))); lamS.set(O.lam); betaS.set(O.beta); fieldCache = null; showFormula(); restart(true); });
   function showFormula() { $('#o-formula').innerHTML = LAB.tex(LANDS[O.land].tex, true); }
   const optHost = $('#o-opts');
   const pills = document.createElement('div'); pills.className = 'pill-row'; pills.style.margin = '6px 0 2px'; optHost.appendChild(pills);
@@ -85,7 +85,8 @@
     b.onclick = () => { O.on[i] = !O.on[i]; b.classList.toggle('on', O.on[i]); b.style.background = O.on[i] ? o.color : '#fff'; b.style.color = O.on[i] ? '#fff' : o.color; mapCv.redraw(); lossCv.redraw(); stats1(); };
     pills.appendChild(b);
   });
-  const lrSliders = OPTS.map((o, i) => LAB.slider(optHost, { label: `<b style="color:${o.color}">●</b> ${o.name} 的学习率 $\\eta$`, min: o.range[0], max: o.range[1], step: 0.01, value: Math.log10(O.lr[i]), fmt: (v) => fe(Math.pow(10, v)), onInput: (v) => { O.lr[i] = Math.pow(10, v); restart(true); } }));
+  const lrSliders = OPTS.map((o, i) => LAB.slider(optHost, { label: `<b style="color:${o.color}">●</b> ${o.name} 的学习率 $\\eta$`, min: o.range[0], max: o.range[1], step: 0.001, value: Math.log10(O.lr[i]), fmt: (v) => fe(Math.pow(10, v)), onInput: (v) => { O.lr[i] = Math.pow(10, v); restart(true); } }));
+  const betaS = LAB.slider('#o-beta', { label: '动量系数 $\\beta$（$m_t=\\beta m_{t-1}+g_t$）', min: 0, max: 0.95, step: 0.05, value: O.beta, fmt: (v) => v.toFixed(2), onInput: (v) => { O.beta = v; restart(true); } });
   const lamS = LAB.slider('#o-lam', { label: 'AdamW 权重衰减 $\\lambda$', min: 0, max: 0.5, step: 0.01, value: O.lam, fmt: (v) => v.toFixed(2), onInput: (v) => { O.lam = v; restart(true); } });
   LAB.checkbox('#o-noise', '给梯度加噪声（模拟小批量 SGD）', false, (v) => { O.noise = v; restart(true); });
   LAB.slider('#o-sigma', { label: '噪声标准差 $\\sigma$', min: -2, max: 1, step: 0.05, value: Math.log10(O.sigma), fmt: (v) => fe(Math.pow(10, v)), onInput: (v) => { O.sigma = Math.pow(10, v); if (O.noise) restart(true); } });
@@ -103,7 +104,7 @@
   }
   function restart(autoplay) { resetRacers(); mapCv.redraw(); lossCv.redraw(); stats1(); if (autoplay && !O.running) setRunning(true); }
   playBtn.onclick = () => { if (O.running) setRunning(false); else { if (O.t >= LANDS[O.land].steps) resetRacers(); setRunning(true); } };
-  $('#o-reset').onclick = () => { setRunning(false); O.start = LANDS[O.land].start.slice(); restart(false); };
+  $('#o-reset').onclick = () => { setRunning(false); const Ld = LANDS[O.land]; O.start = Ld.start.slice(); O.lr = Ld.lr.slice(); O.lam = Ld.lam; O.beta = Ld.beta; lrSliders.forEach((s, k) => s.set(Math.log10(O.lr[k]))); lamS.set(O.lam); betaS.set(O.beta); restart(false); };
   // 等高线底图（缓存）
   let fieldCache = null;
   function field(P) {
@@ -123,7 +124,7 @@
   }
   const mapCv = LAB.canvas('#o-map', (ctx, w, h) => {
     const Ld = LANDS[O.land], [x0, x1, y0, y1] = Ld.dom;
-    const P = new LAB.Plot(ctx, w, h, { xmin: x0, xmax: x1, ymin: y0, ymax: y1, grid: false, xlabel: 'θ₁', ylabel: 'θ₂', pad: { l: 40, r: 10, t: 10, b: 34 } });
+    const P = new LAB.Plot(ctx, w, h, { xmin: x0, xmax: x1, ymin: y0, ymax: y1, grid: false, xlabel: 'x（东西）', ylabel: 'y（南北）', pad: { l: 40, r: 10, t: 10, b: 34 } });
     mapCv._P = P;
     const F = field(P);
     ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(F.off, P.x0, P.y1, P.x1 - P.x0, P.y0 - P.y1); ctx.restore();
@@ -165,34 +166,69 @@
     P.unclip();
   });
   const ost = OPTS.map((o) => LAB.stat('#o-stats', o.name, o.cls));
-  function stats1() { racers.forEach((r, i) => ost[i].set(!O.on[i] ? '<small>未启用</small>' : r.dead ? '发散' : fe(r.loss[r.loss.length - 1]))); }
+  function stats1() { racers.forEach((r, i) => ost[i].set(!O.on[i] ? '<small>未启用</small>' : r.dead ? '发散' : fe(r.loss[r.loss.length - 1]))); hand(); }
+  // 前两步落点：独立重算（不受动画进度影响），与书中手算对照
+  function twoSteps(i) {
+    const Ld = LANDS[O.land], key = OPTS[i].key, lr = O.lr[i], b1 = 0.9, b2 = 0.999, eps = 1e-8;
+    let x = O.start[0], y = O.start[1], m = [0, 0], v = [0, 0]; const out = [];
+    for (let t = 1; t <= 2; t++) {
+      const g = Ld.g(x, y);
+      if (key === 'sgd') { x -= lr * g[0]; y -= lr * g[1]; }
+      else if (key === 'mom') { m = m.map((a, k) => O.beta * a + g[k]); x -= lr * m[0]; y -= lr * m[1]; }
+      else { m = m.map((a, k) => b1 * a + (1 - b1) * g[k]); v = v.map((a, k) => b2 * a + (1 - b2) * g[k] * g[k]); const u = m.map((a, k) => (a / (1 - Math.pow(b1, t))) / (Math.sqrt(v[k] / (1 - Math.pow(b2, t))) + eps)); const lam = key === 'adamw' ? O.lam : 0; x -= lr * (u[0] + lam * x); y -= lr * (u[1] + lam * y); }
+      out.push([x, y]);
+    }
+    return out;
+  }
+  const BOOK = [[[9.3, -0.75], [8.649, 0.5625]], [[9.3, -0.75], [8.299, -0.3125]], null, [[8.0, -0.1], null]];
+  const f4 = (v) => (Math.abs(v) < 5e-5 ? '0' : String(+v.toFixed(4)));
+  function hand() {
+    const Ld = LANDS[O.land];
+    let html = '<tr><th>优化器</th><th>第 1 步 $(x_1,y_1)$</th><th>第 2 步 $(x_2,y_2)$</th><th>书中手算</th></tr>';
+    OPTS.forEach((o, i) => {
+      const s = twoSteps(i), bk = Ld.book ? BOOK[i] : null;
+      const bt = bk ? bk.filter(Boolean).map((p) => `(${p[0]}, ${p[1]})`).join(' → ') : '–';
+      html += `<tr><td><b style="color:${o.color}">●</b> ${o.name}</td>${s.map((p) => `<td>(${f4(p[0])}, ${f4(p[1])})</td>`).join('')}<td>${bt}</td></tr>`;
+    });
+    $('#o-hand').innerHTML = html; LAB.renderMath($('#o-hand'));
+    const sameStart = O.start[0] === 10 && O.start[1] === 1;
+    $('#o-handnote').innerHTML = Ld.book ? (sameStart ? `南北方向 SGD 每步乘 $1-50\\eta=${(1 - 50 * O.lr[0]).toFixed(3)}$：${Math.abs(1 - 50 * O.lr[0]) < 1 ? '绝对值小于 1，撞墙越撞越低' : '绝对值不小于 1，越撞越高，迟早炸飞'}。书中数值对应 $\\eta_{\\text{SGD}}=\\eta_{\\text{动量}}=0.035$、$\\beta=0.5$、$\\eta_{\\text{AdamW}}=1$、$\\lambda=0.1$。` : '起点已改动，书中手算的数字只适用于起点 $(10,1)$；点“重置”回到书中设定。') : '这是附赠地形，书中没有对应的手算。';
+    LAB.renderMath($('#o-handnote'));
+  }
   showFormula(); resetRacers(); stats1();
   // 等高线图第一次进入视野时自动开跑（手机上控件在上方，避免还没看到就跑完）
   const io = new IntersectionObserver((ents) => { if (ents.some((e) => e.isIntersecting) && isOn('race')) { io.disconnect(); if (!O.running && O.t === 0) setRunning(true); } }, { threshold: 0.5 });
   io.observe($('#o-map'));
 
-  /* ================= 实验 2：L2 ≠ 权重衰减 ================= */
-  const D = { th: 2, g: 10, lam: 0.5, eta: 0.1, scale: 1, lam2: 0.1, steps: 1000 };
-  const sTh = LAB.slider('#d-theta', { label: '初值 $\\theta_0$', min: -3, max: 3, step: 0.1, value: D.th, fmt: (v) => v.toFixed(1), onInput: (v) => { D.th = v; upd2a(); } });
-  const sG = LAB.slider('#d-g', { label: '第 1 步梯度 $g_1$', min: -20, max: 20, step: 0.1, value: D.g, fmt: (v) => v.toFixed(1), onInput: (v) => { D.g = v; upd2a(); } });
-  const sL = LAB.slider('#d-lam', { label: '正则 / 衰减系数 $\\lambda$', min: 0, max: 2, step: 0.05, value: D.lam, fmt: (v) => v.toFixed(2), onInput: (v) => { D.lam = v; upd2a(); } });
+  /* ================= 实验 2：两个记账本与橡皮筋 ================= */
+  const BOOKD = { gde: 10, gsh: 0.001, b2: 0.999, w: 2, lam: 1, eta: 0.1 };
+  const D = Object.assign({}, BOOKD, { scale: 1, lam2: 0.1, steps: 1000 });
+  const B2S = [0.9, 0.95, 0.99, 0.995, 0.999, 0.9995, 0.9999];
+  const sGde = LAB.slider('#d-gde', { label: '“的”字的斜率 $g_{\\text{的}}$', min: -4, max: 2, step: 0.1, value: Math.log10(D.gde), fmt: (v) => fe(Math.pow(10, v)), onInput: (v) => { D.gde = Math.pow(10, v); upd2a(); } });
+  const sGsh = LAB.slider('#d-gsh', { label: '“熵”字的斜率 $g_{\\text{熵}}$', min: -4, max: 2, step: 0.1, value: Math.log10(D.gsh), fmt: (v) => fe(Math.pow(10, v)), onInput: (v) => { D.gsh = Math.pow(10, v); upd2a(); } });
+  const sB2 = LAB.slider('#d-b2', { label: '二号账本留存率 $\\beta_2$', min: 0, max: B2S.length - 1, step: 1, value: B2S.indexOf(D.b2), fmt: (v) => String(B2S[v]), onInput: (v) => { D.b2 = B2S[v]; upd2a(); } });
+  const sW = LAB.slider('#d-w', { label: '两个旋钮的刻度 $w$', min: -3, max: 3, step: 0.1, value: D.w, fmt: (v) => v.toFixed(1), onInput: (v) => { D.w = v; upd2a(); } });
+  const sL = LAB.slider('#d-lam', { label: '橡皮筋紧度 $\\lambda$', min: 0, max: 2, step: 0.05, value: D.lam, fmt: (v) => v.toFixed(2), onInput: (v) => { D.lam = v; upd2a(); } });
   const sE = LAB.slider('#d-eta', { label: '学习率 $\\eta$', min: 0.01, max: 0.5, step: 0.01, value: D.eta, fmt: (v) => v.toFixed(2), onInput: (v) => { D.eta = v; upd2a(); } });
-  $('#d-book').onclick = () => { D.th = 2; D.g = 10; D.lam = 0.5; D.eta = 0.1; sTh.set(2); sG.set(10); sL.set(0.5); sE.set(0.1); upd2a(); };
-  const ds1 = LAB.stat('#d-stats', 'AdamW：$\\theta_1$', 'leaf');
-  const ds2 = LAB.stat('#d-stats', 'Adam + $L_2$：$\\theta_1$', 'coral');
-  const ds3 = LAB.stat('#d-stats', '不加正则的 Adam：$\\theta_1$');
-  const ds4 = LAB.stat('#d-stats', '正则实际贡献：AdamW / $L_2$', 'plum');
-  const f1 = (v) => (Math.abs(v) < 5e-10 ? 0 : v).toFixed(Math.abs(v) >= 100 ? 1 : 2);
-  const ratio = (g) => (Math.abs(g) < 1e-12 ? 0 : Math.sign(g)); // m̂₁/√v̂₁ = sign(g)（忽略 ε）
+  $('#d-book').onclick = () => { Object.assign(D, BOOKD); sGde.set(Math.log10(D.gde)); sGsh.set(Math.log10(D.gsh)); sB2.set(B2S.indexOf(D.b2)); sW.set(D.w); sL.set(D.lam); sE.set(D.eta); upd2a(); };
+  const ds1 = LAB.stat('#d-stats', '未校正第 1 步步幅', 'coral');
+  const ds2 = LAB.stat('#d-stats', '校正后第 1 步步幅', 'leaf');
+  const ds3 = LAB.stat('#d-stats', '$L_2$ 拉回：的 / 熵', 'coral');
+  const ds4 = LAB.stat('#d-stats', 'AdamW 拉回：的 / 熵', 'leaf');
+  const tn = (x) => { if (x === 0) return '0'; const a = Math.abs(x); if (a >= 0.01 && a < 1e5) return String(+x.toPrecision(4)); const e = Math.floor(Math.log10(a)), m = +(x / Math.pow(10, e)).toFixed(3); return (m === 1 ? '' : m + '\\times ') + '10^{' + e + '}'; };
   function upd2a() {
-    const { th, g, lam, eta } = D, b1 = 0.9, b2 = 0.99;
-    const rW = ratio(g), dec = lam * th, tW = th - eta * (rW + dec);
-    const gt = g + lam * th, rL = ratio(gt), tL = th - eta * rL, tA = th - eta * rW;
-    const n = (v) => (v < 0 ? `(${f1(v)})` : f1(v));
-    $('#d-w').innerHTML = LAB.tex(`\\begin{gathered}\\hat m_1=\\tfrac{0.1\\times ${n(g)}}{1-0.9}=${f1(g)},\\quad \\sqrt{\\hat v_1}=\\sqrt{\\tfrac{0.01\\times ${n(g)}^2}{1-0.99}}=${f1(Math.abs(g))}\\\\ \\tfrac{\\hat m_1}{\\sqrt{\\hat v_1}}=${f1(rW)},\\quad \\lambda\\theta_0=${f1(dec)},\\quad \\theta_1=${f1(th)}-${eta}\\times(${f1(rW)}+${n(dec)})=\\mathbf{${f1(tW)}}\\end{gathered}`, true);
-    $('#d-l2').innerHTML = LAB.tex(`\\begin{gathered}\\tilde g_1=g_1+\\lambda\\theta_0=${f1(g)}+${n(dec)}=${f1(gt)},\\quad \\hat m_1=${f1(gt)},\\quad \\sqrt{\\hat v_1}=${f1(Math.abs(gt))}\\\\ \\tfrac{\\hat m_1}{\\sqrt{\\hat v_1}}=${f1(rL)},\\quad \\theta_1=${f1(th)}-${eta}\\times ${n(rL)}=\\mathbf{${f1(tL)}}\\end{gathered}`, true);
-    ds1.set(f1(tW)); ds2.set(f1(tL)); ds3.set(f1(tA));
-    ds4.set(`${f1(tA - tW)}<small> / </small>${f1(tA - tL)}`);
+    const b1 = 0.9, b2 = D.b2, rows = [['的', D.gde], ['熵', D.gsh]];
+    const raw = (1 - b1) / Math.sqrt(1 - b2);
+    $('#d-bias').innerHTML = LAB.tex('\\begin{aligned}' + rows.map(([n, g]) => {
+      const m1 = (1 - b1) * g, v1 = (1 - b2) * g * g;
+      return `&\\text{“${n}”：}\\ m_1=${tn(m1)},\\ v_1=${tn(v1)},\\quad \\tfrac{m_1}{\\sqrt{v_1}}=\\mathbf{${tn(m1 / Math.sqrt(v1))}},\\quad \\tfrac{\\hat m_1}{\\sqrt{\\hat v_1}}=\\tfrac{${tn(m1 / (1 - b1))}}{\\sqrt{${tn(v1 / (1 - b2))}}}=\\mathbf{1}`;
+    }).join('\\\\') + '\\end{aligned}', true);
+    const pull = (g) => (D.eta * D.lam * D.w) / Math.abs(g), pw = D.eta * D.lam * D.w;
+    $('#d-l2').innerHTML = LAB.tex('\\begin{aligned}' + rows.map(([n, g]) => `&\\text{“${n}”：}\\ \\eta\\cdot\\frac{\\lambda w}{\\sqrt{\\hat v}}=${D.eta}\\times\\frac{${tn(D.lam * D.w)}}{${tn(Math.abs(g))}}=\\mathbf{${tn(pull(g))}}`).join('\\\\') + '\\end{aligned}', true);
+    $('#d-wd').innerHTML = LAB.tex(`\\text{两个字都是：}\\ \\eta\\lambda w=${D.eta}\\times${tn(D.lam)}\\times${tn(D.w)}=\\mathbf{${tn(pw)}}`, true);
+    ds1.set(raw.toFixed(3)); ds2.set('1.000');
+    ds3.set(`${tn(pull(D.gde)).replace('\\times ', '×').replace(/10\^\{(-?\d+)\}/, (_, e) => '10' + sup(e))}<small> / </small>${tn(pull(D.gsh)).replace('\\times ', '×').replace(/10\^\{(-?\d+)\}/, (_, e) => '10' + sup(e))}`);
+    ds4.set(`${tn(pw)}<small> / </small>${tn(pw)}`);
   }
   upd2a();
   // 多坐标长程实验
@@ -264,7 +300,7 @@
   upd2b();
 
   /* ================= 实验 3：学习率调度设计台 ================= */
-  const S = { pick: 0, T: 10000, warm: 0.05, peak: 3e-4, rmin: 0.1, wsd: 0.2, cursor: 5000 };
+  const S = { pick: 0, T: 10000, warm: 0.2, peak: 1e-3, rmin: 0.1, wsd: 0.2, cursor: 6000 };
   const SCH = [
     { name: '预热 + 余弦', color: C.c5 },
     { name: 'WSD', color: C.c2 },
@@ -303,7 +339,7 @@
   LAB.segmented('#l-pick', SCH.map((s) => s.name), 0, (i) => { S.pick = i; upd3(); });
   const fmtSteps = (v) => Math.round(v).toLocaleString();
   LAB.slider('#l-T', { label: '总步数 $T_{\\max}$', min: 1000, max: 50000, step: 1000, value: S.T, fmt: fmtSteps, onInput: (v) => { S.cursor = Math.round((S.cursor / S.T) * v); S.T = v; upd3(); } });
-  LAB.slider('#l-warm', { label: '预热比例 $T_{\\text{warmup}}/T_{\\max}$', min: 0, max: 0.3, step: 0.005, value: S.warm, fmt: (v) => (v * 100).toFixed(1) + '%', onInput: (v) => { S.warm = v; upd3(); } });
+  LAB.slider('#l-warm', { label: '预热比例 $T_w/T_{\\max}$', min: 0, max: 0.3, step: 0.005, value: S.warm, fmt: (v) => (v * 100).toFixed(1) + '%', onInput: (v) => { S.warm = v; upd3(); } });
   const PEAKS = [1e-5, 2e-5, 5e-5, 1e-4, 2e-4, 3e-4, 5e-4, 8e-4, 1e-3, 1.2e-3, 1.5e-3, 2e-3, 3e-3];
   LAB.slider('#l-peak', { label: '峰值 $\\eta_{\\max}$', min: 0, max: PEAKS.length - 1, step: 1, value: PEAKS.indexOf(S.peak), fmt: (v) => fe(PEAKS[v]), onInput: (v) => { S.peak = PEAKS[v]; upd3(); } });
   LAB.slider('#l-min', { label: '$\\eta_{\\min}/\\eta_{\\max}$', min: 0, max: 0.5, step: 0.01, value: S.rmin, fmt: (v) => v.toFixed(2), onInput: (v) => { S.rmin = v; upd3(); } });
@@ -314,7 +350,7 @@
     const P = new LAB.Plot(ctx, w, h, { xmin: 0, xmax: S.T, ymin: 0, ymax, xlabel: '训练步 t', ylabel: '学习率', yfmt: (v) => (v === 0 ? '0' : fe(v)), pad: { l: 62, r: 14, t: 12, b: 36 } }).axes();
     lrCv._P = P;
     const Tw = Math.round(S.warm * S.T);
-    if (Tw > 0) { P.vline(Tw, C.amber, [4, 4]); P.text(Tw, ymax * 0.97, ' T_warmup', C.amber, 'left', 'top', '11px Avenir Next, sans-serif'); }
+    if (Tw > 0) { P.vline(Tw, C.amber, [4, 4]); P.text(Tw, ymax * 0.97, ' T_w', C.amber, 'left', 'top', '11px Avenir Next, sans-serif'); }
     SC.forEach((s, k) => { if (k !== S.pick) P.line(s.ts, s.lrs, SCH[k].color, 1.4, null); });
     const s = SC[S.pick]; P.area(s.ts, s.lrs, SCH[S.pick].color, 0.1); P.line(s.ts, s.lrs, SCH[S.pick].color, 3);
     P.vline(S.cursor, C.ink, [2, 3], 1);
@@ -345,8 +381,8 @@
   function upd3() {
     compute3();
     $('#l-legend').innerHTML = SCH.map((s, k) => `<span><i style="background:${s.color}${k === S.pick ? ';height:5px' : ''}"></i>${s.name}</span>`).join('');
-    const T = S.T, Tw = Math.round(S.warm * T), pts = [['$T_{\\text{warmup}}$', Math.max(Tw, 1)], ['$T/2$', Math.round(T / 2)], ['$0.9T$', Math.round(0.9 * T)], ['$T_{\\max}$', T]];
-    let rows = `<tr><th>调度</th>${pts.map((p) => `<th>$\\eta$ @ ${p[0]}</th>`).join('')}<th>平均 $\\eta/\\eta_{\\max}$</th><th>玩具终值损失</th></tr>`;
+    const T = S.T, Tw = Math.round(S.warm * T), pts = [['$T_w/2$', Math.max(Math.round(Tw / 2), 1)], ['$T_w$', Math.max(Tw, 1)], ['退火中点', Math.round(Tw + (T - Tw) / 2)], ['$T_{\\max}$', T]];
+    let rows = `<tr><th>调度</th>${pts.map((p) => `<th>$\\eta$ @ ${p[0]}<br><small>$t=${p[1]}$</small></th>`).join('')}<th>平均 $\\eta/\\eta_{\\max}$</th><th>玩具终值损失</th></tr>`;
     SC.forEach((s, k) => { rows += `<tr${k === S.pick ? ' style="background:var(--mist)"' : ''}><td><b style="color:${SCH[k].color}">●</b> ${SCH[k].name}</td>${pts.map((p) => `<td>${fe(lrAt(k, p[1]))}</td>`).join('')}<td>${s.mean.toFixed(3)}</td><td>${fe(s.Lfin)}</td></tr>`; });
     $('#l-table').innerHTML = rows; LAB.renderMath($('#l-table'));
     lrCv.redraw(); lossCv3.redraw(); stats3();

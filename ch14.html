@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>第 14 章 · 在线实验室</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="assets/lab.css">
+<link rel="stylesheet" href="assets/lab.css?v=20261110">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-<script defer src="assets/lab.js"></script>
+<script defer src="assets/lab.js?v=20261110"></script>
 <script defer src="ch14.js"></script>
 <style>.fno-chip { display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:999px; border:1px solid var(--line); background:#fff; font-size:13px; white-space:nowrap; } .fno-chip.on { background:var(--c6l); border-color:var(--teal); color:var(--teal); } .fno-arrow { color:var(--slate); margin:0 2px; }</style>
 </head>
@@ -16,20 +16,20 @@
 <main class="container">
 
   <!-- ========================= 实验 1 ========================= -->
-  <section class="experiment" id="heat" data-title="热方程的频域一步解">
+  <section class="experiment" id="heat" data-title="铁棒热量散开算子">
     <div class="lab-grid">
       <div class="card controls">
-        <div class="card-title"><span class="dot">1</span>初始温度与扩散</div>
-        <div class="explain small">周期区间 $[0,2\pi]$ 上的热方程 $\dfrac{\partial u}{\partial t}=\kappa\dfrac{\partial^2 u}{\partial x^2}$，初始温度 $a(x)=u(x,0)$。</div>
+        <div class="card-title"><span class="dot">1</span>铁棒的初始温度与散热</div>
+        <div class="explain small">一根长 $1$ 米、两端保持 $0$ 度的铁棒，热方程 $\dfrac{\partial u}{\partial t}=\kappa\dfrac{\partial^2 u}{\partial x^2}$，初始温度 $a(x)=u(x,0)$。书中取 $a(x)=10\sin(\pi x)$，$\kappa=\ln 2/(0.1\pi^2)\approx0.70$，于是 $t=0.1$ 时整条曲线恰好衰减成 $0.5$ 倍。</div>
         <div class="small muted">初始温度 $a(x)$：</div>
         <div id="h-preset" style="margin:6px 0 4px"></div>
         <div class="caption" style="margin-top:2px">也可以在右侧频谱图上拖动柱子，直接改写各个模态的初始振幅。</div>
         <div id="h-kappa"></div>
         <div id="h-t"></div>
         <div class="btn-row">
-          <button class="btn teal" id="h-play">▶ 播放 $t: 0\to3$</button>
+          <button class="btn teal" id="h-play">▶ 播放 $t: 0\to0.5$</button>
         </div>
-        <div class="caption">在上图中点击或拖动，可以选择查询点 $y=(x,t)$，下方表格按 DeepONet 的“分支 × 主干”拆开计算 $u(x,t)$。</div>
+        <div class="caption">在上图中点击或拖动，可以选择查询点 $y$（书中查 $y=0.25$）；下方表格按 DeepONet 的“分支 × 主干”拆开计算 $u(y,t)$。灰色方块是“焊死在 3 个格点上”的普通网络能看到的全部数字。</div>
       </div>
       <div class="stack">
         <div class="card">
@@ -39,22 +39,22 @@
             <span><i style="background:var(--slate);opacity:.5"></i>$u(x,0)=a(x)$</span>
             <span><i style="background:var(--c4)"></i>$u(x,t)$ 频域精确解</span>
             <span><i style="background:var(--c6)"></i>有限差分（64 个网格点）</span>
+            <span><i style="background:var(--slate)"></i>3 个格点 $x=0,0.5,1$</span>
           </div>
         </div>
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c1)">k</span>频域：每个模态乘上 $e^{-\kappa k^2 t}$<span class="sub">空心 = 初始　实心 = $t$ 时刻</span></div>
+          <div class="card-title"><span class="dot" style="background:var(--c1)">k</span>频域：每个正弦模态乘上 $e^{-\kappa (k\pi)^2 t}$<span class="sub">空心 = 初始　实心 = $t$ 时刻</span></div>
           <div class="viz h260" id="h-spec"></div>
           <div class="legend">
-            <span><i style="background:var(--c1)"></i>$\cos kx$ 系数</span>
-            <span><i style="background:var(--c2)"></i>$\sin kx$ 系数</span>
-            <span>上方数字：乘子 $e^{-\kappa k^2 t}$</span>
+            <span><i style="background:var(--c2)"></i>$\sin k\pi x$ 系数</span>
+            <span>上方数字：乘子 $e^{-\kappa (k\pi)^2 t}$</span>
           </div>
         </div>
         <div class="stats" id="h-stats"></div>
         <div class="card">
             <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>三步频域解</div>
             <div class="formula" id="h-formula"></div>
-            <p class="small muted">二阶导数在频域就是乘以 $-k^2$，所以每个模态独立地按 $e^{-\kappa k^2 t}$ 衰减。书中取 $\kappa=0.1$、$t=1$：$e^{-0.1}\approx0.905$，$e^{-0.9}\approx0.407$，高频起伏被迅速抹平。</p>
+            <p class="small muted">对 $\sin(k\pi x)$ 求两次导数就是乘以 $-(k\pi)^2$，所以每个正弦模态独立地按 $e^{-\kappa (k\pi)^2 t}$ 衰减，形状不变、只是整体变矮。书中的 $\kappa t=\ln2/\pi^2$ 让 $k=1$ 的乘子恰好是 $0.5$：$10\sin\pi x\to5\sin\pi y$，查 $y=0.25$ 得 $5\sin(\pi/4)\approx3.536$；同一时刻 $k=3$ 的乘子只剩 $0.5^9\approx0.002$，高频起伏几乎被抹平。</p>
         </div>
         <div class="card">
             <div class="card-title"><span class="dot" style="background:var(--teal)">⟨⟩</span>DeepONet 视角：分支 · 主干</div>
@@ -63,10 +63,10 @@
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>保持书中算例和 $\kappa=0.1$、$t=1$：读出两个乘子 0.905、0.407，以及 $u(x,1)\approx2.715\cos x+0.813\cos 3x$。</li>
-            <li>点“播放”：$\cos 3x$ 的小波纹先消失，只剩平缓的 $\cos x$。衰减速度和 $k^2$ 成正比。</li>
-            <li>选“方波”：棱角（高频）几乎瞬间被磨圆。再把 $\kappa$ 调到 0.5、$t$ 调到 3：右侧有限差分要走多少步？频域只需 1 次乘法。</li>
-            <li>在曲线上换几个查询点：主干网 $t_k(y)$ 只依赖坐标，分支网 $b_k(a)$ 只依赖初始函数，两者内积就是答案。</li>
+            <li>保持书中算例：读出 $k=1$ 的乘子 $0.500$、$u(y)=5\sin\pi y$，以及查询点 $y=0.25$ 处的 $3.536$。3 个灰色格点只记得 $[0,10,0]\to[0,5,0]$。</li>
+            <li>点“播放”：选“方波”时尖角（高频）先消失，只剩平缓的 $\sin\pi x$。衰减速度和 $k^2$ 成正比。</li>
+            <li>把 $\kappa$ 调到 2、$t$ 调到 0.5：右侧有限差分要走多少步？频域只需 1 次乘法。</li>
+            <li>在曲线上换几个查询点：主干网 $t_k(y)$ 只依赖坐标，分支网 $b_k(a)$ 只依赖初始函数，两者内积就是答案；查 $1000$ 个点也不用改任何参数。</li>
           </ol>
         </div>
       </div>
@@ -78,6 +78,7 @@
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">2</span>输入函数 $v(x)$</div>
+        <div class="caption" style="margin:0 0 6px">“书中算例”：$v=2+3\cos x+0.5\cos 10x$，只留 $0$、$1$ 号频率，$\mathbf R=\mathrm{diag}(2.5,2)$，$W=2$；“练习 14.2”：$v=1+2\cos x-3\sin x+0.8\cos 8x$，$W=0.5$。</div>
         <div id="n-preset" style="margin:4px 0 4px"></div>
         <div class="caption" style="margin-top:2px">直接在上图里按住拖动，可以手绘任意输入函数。</div>
         <div class="small muted" style="margin-top:10px">网格点数 $N$：</div>
@@ -123,6 +124,7 @@
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
+            <li>选“书中算例”：频谱上只有 $0$、$1$、$10$ 号三根柱子；保留 $k\le1$、乘 $\mathbf R$、加 $W v$ 之后，输出正是 $9+12\cos x+\cos 10x$。切到“练习 14.2”，输出变成 $2.5+4\cos x+0.5\sin x+0.4\cos 8x$。</li>
             <li>选“方波”，把 $k_{\max}$ 从 1 慢慢加大：跳变处始终有约 9% 的过冲（吉布斯现象），截断误差下降得很慢。</li>
             <li>选“毛刺正弦”：毛刺来自 18 到 30 的高频，$k_{\max}=10$ 就把它们全部滤掉，只剩光滑主体。</li>
             <li>选“毛刺正弦”，把 $\mathbf R_k$ 设为“求导”，在 64、128、256 之间切换 $N$：与 1024 点细网格的输出只差 $10^{-14}$ 量级，同一组权重在任何分辨率上给出同一个答案。</li>
@@ -134,7 +136,7 @@
   </section>
 
   <!-- ========================= 实验 3 ========================= -->
-  <section class="experiment" id="pinn" data-title="PINN 残差与激活函数">
+  <section class="experiment" id="pinn" data-title="物理残差罚分">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">3</span>不给答案，只给方程</div>
@@ -153,6 +155,17 @@
         <div id="p-kappa"></div>
       </div>
       <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--amber)">✍</span>书中手算：两端都对上的甲、乙两个模型<span class="sub">没有热源的铁棒稳态：$u''(y)=0$</span></div>
+          <div id="b-c"></div>
+          <div class="viz h260" id="b-plot"></div>
+          <div class="legend">
+            <span><i style="background:var(--c6)"></i>甲 $u=10y$</span>
+            <span><i style="background:var(--c4)"></i>乙 $u=10y^2$</span>
+            <span><i style="background:var(--navy)"></i>当前 $u=(1-c)\cdot10y+c\cdot10y^2$</span>
+          </div>
+          <div class="stats" id="b-stats"></div>
+        </div>
         <div class="row2">
           <div class="card">
             <div class="card-title"><span class="dot" style="background:var(--c4)">r</span>物理残差 $r=\hat u_t-\kappa\hat u_{xx}$</div>
@@ -196,6 +209,7 @@
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
+            <li>在最上面的手算卡片里把 $c$ 从 0 拖到 1：两端数据误差一直是 0，物理罚分却从 0 涨到 $20^2=400$，这就是书中“抓个正着”的模型乙。</li>
             <li>“手调候选解”模式下，固定 $A=1$、$\omega=1$，拖动 $\lambda$：残差图在 $\lambda=\kappa\omega^2$ 时整片变白，这就是物理约束。</li>
             <li>把 $\omega$ 调到 2：残差仍可以通过 $\lambda=4\kappa$ 归零，但初值误差变大。三项损失缺一不可。</li>
             <li>切到“训练小网络”，用 $\tanh$ 训练：相对误差降到千分之几，$t=1$ 的切片贴合真解。</li>

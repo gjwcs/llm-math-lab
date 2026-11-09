@@ -24,22 +24,22 @@
 
   // icon: 单个 emoji 或字符；color：卡片图标底色
   const CHAPTERS = [
-    { n: 1, part: 0, icon: '🎲', color: COLORS.c1, title: '概率论与信息论视角下的语言', sub: '大模型到底在算什么？', demo: '调 Logits 与温度看 Softmax、熵、困惑度与 KL；再亲自玩一局香农的“猜字母赌局”。' },
-    { n: 2, part: 0, icon: '🧭', color: COLORS.c6, title: '高维空间的几何学', sub: '词向量、内积与“维度诅咒与祝福”', demo: '随机向量在高维几乎正交、球体体积挤到表皮；拖动词向量做“国王 − 男人 + 女人”。' },
-    { n: 3, part: 0, icon: '📐', color: COLORS.c3, title: '逼近论与表征学习', sub: '为什么深层网络能拟合万物？', demo: '用 N 段 ReLU 折线拼出任意曲线；看深度如何像折纸一样让线段数翻倍。' },
-    { n: 4, part: 0, icon: '🌀', color: COLORS.c5, title: '核方法、特征映射与 NTK', sub: '无限宽网络的线性化极限', demo: '把异或点抬到三维一刀切开；随机傅里叶特征逼近 RBF 核；观察 NTK 的频谱偏置。' },
-    { n: 5, part: 1, icon: '🔦', color: COLORS.c1, title: '注意力机制的统计力学', sub: 'Softmax、缩放点积与 √dₖ 之谜', demo: '实时注意力热力图；开关 1/√dₖ 看 Softmax 饱和与梯度死区；KV Cache 显存计算器。' },
-    { n: 6, part: 1, icon: '🕰️', color: COLORS.c2, title: '把时间拧成旋转角', sub: '从绝对位置编码到 RoPE', demo: '在复平面上旋转 q、k，验证相对位置不变性；调底数 θ 看远程衰减与长度外推。' },
-    { n: 7, part: 1, icon: '🛣️', color: COLORS.c3, title: '深层信号传播动力学', sub: '残差流、RMSNorm 与 SwiGLU 门控', demo: '百层网络中信号与梯度的范数传播：有无残差、Pre-LN 与 Post-LN 对比；激活函数门控形状。' },
-    { n: 8, part: 1, icon: '📮', color: COLORS.c4, title: '稀疏混合专家与状态空间模型', sub: 'MoE 路由与 Mamba 选择性扫描', demo: 'Top-k 路由与负载均衡损失、无辅助损失偏置更新；SSM 状态记忆随 Δ 的选择性衰减。' },
-    { n: 9, part: 2, icon: '🧗', color: COLORS.c4, title: '非凸优化的导航仪', sub: '从 SGD 到 AdamW 与余弦退火', demo: '在峡谷、鞍点、香蕉谷地形上比赛 SGD / Momentum / Adam / AdamW；学习率调度器设计台。' },
-    { n: 10, part: 2, icon: '📈', color: COLORS.c1, title: '泛化理论与 Scaling Laws', sub: '“大力出奇迹”的数学幂律', demo: '给定算力预算求 Chinchilla 最优 N、D；平滑的损失如何变成陡峭的“涌现”；双下降曲线。' },
-    { n: 11, part: 2, icon: '🧩', color: COLORS.c3, title: '低资源微调的线性代数奇迹', sub: '本征维度与 LoRA 低秩适配', demo: '秩 r 与参数量、显存；奇异值谱截断误差；NF4 与 INT4 量化刻度的误差对比。' },
-    { n: 12, part: 2, icon: '🌡️', color: COLORS.c2, title: '解码、生成与人类对齐', sub: '温度、Top-p 与 DPO', demo: '温度 / Top-k / Top-p 实时截断与采样生成；DPO 损失曲面；投机采样加速比模拟。' },
-    { n: 13, part: 3, icon: '☕', color: COLORS.c5, title: '连续生成模型的随机微积分', sub: 'DDPM、得分匹配到流匹配', demo: '二维点云的前向加噪与反向去噪动画；得分场箭头；流匹配直线路径与 CFG 引导强度。' },
-    { n: 14, part: 3, icon: '🔥', color: COLORS.c4, title: '无穷维函数空间上的神经算子', sub: 'DeepONet 与傅里叶神经算子', demo: '编辑初始温度、观察热方程在频域的一步精确解；截断傅里叶模态数看 FNO 的取舍。' },
-    { n: 15, part: 3, icon: '🩺', color: COLORS.c6, title: '大模型的不确定性量化', sub: '温度校准与共形预测', demo: '可靠性图与 ECE、温度校准；调 α 得到带覆盖率保证的共形预测集合。' },
-    { n: 16, part: 3, icon: '♟️', color: COLORS.c1, title: '测试时计算扩展', sub: '思维链概率与树搜索', demo: 'Pass@k 无偏估计、Best-of-N 与 KL 代价、多数投票；一步一步展开 PUCT 树搜索。' },
+    { n: 1, part: 0, icon: '🎲', color: COLORS.c1, title: '概率论与信息论视角下的语言', sub: '大模型到底在算什么？', demo: '给“太阳从＿＿边升起”开罚单，看交叉熵、KL 与温度；亲自玩一局香农的“猜字母赌局”；再看连乘下溢与困惑度“平均几选一”。' },
+    { n: 2, part: 0, icon: '🧭', color: COLORS.c6, title: '高维空间的几何学', sub: '词向量、内积与为什么高维空间这么奇妙？', demo: '拖动猫、狗、国王的词向量算余弦，验证“国王 − 男人 + 女人 ≈ 王后”；扔硬币造随机箭头看高维近似正交；切高维西瓜，看注意力为什么要除以 √d。' },
+    { n: 3, part: 0, icon: '📐', color: COLORS.c3, title: '逼近论与表征学习', sub: '为什么简单的折线（ReLU）能拼出世间万物？', demo: '三个 ReLU 搭帐篷并拼出抛物线；对折 L 次数出 2^L 段折线；比较 ReLU、SiLU、GELU 与死亡 ReLU。' },
+    { n: 4, part: 0, icon: '🌀', color: COLORS.c5, title: '从“把床单提起来切蛋糕”看懂核方法与神经正切核（NTK）', sub: '', demo: '把异或点提到三维一刀切开；先点积再平方，验证核技巧与指数核展开；两道题的 NTK 误差赛跑。' },
+    { n: 5, part: 1, icon: '🔦', color: COLORS.c1, title: '注意力机制（Attention）到底在算什么？', sub: '从查字典、Softmax 到为什么要除以 √dₖ', demo: '图书馆借书三步走（打分、Softmax、加权抄笔记）；√dₖ 如何救活导数；“我/喝/水”的因果掩码与 KV 缓存。' },
+    { n: 6, part: 1, icon: '🕰️', color: COLORS.c2, title: '怎么让模型知道词的先后顺序？', sub: '从贴门牌号到 RoPE（旋转位置编码）的钟表指针魔法', demo: '钟表指针转出相对距离；4 维向量里秒针时针一起转；调慢表针（位置插值与 NTK 缩放）读长文。' },
+    { n: 7, part: 1, icon: '🛣️', color: COLORS.c3, title: '为什么 100 层的深网络不会传丢信号？', sub: '残差直通车（Residual）、RMSNorm 与 SwiGLU 门控', demo: '百层连乘与 +1 直通车；(1,2,3,4) 的 LayerNorm 与 RMSNorm 手算对比；SwiGLU 水龙头车间。' },
+    { n: 8, part: 1, icon: '📮', color: COLORS.c4, title: '怎么让大模型又大又快？', sub: '稀疏混合专家（MoE 专科医院分诊）与状态空间模型（Mamba）', demo: '分诊台与负载均衡罚款；Mamba 抗噪备忘录；注意力 T² 与 MoE 激活参数“两堵墙”。' },
+    { n: 9, part: 2, icon: '🧗', color: COLORS.c4, title: '怎么一步步拧好几百亿个旋钮？', sub: '从梯度下降（SGD）、动量惯性到 AdamW 与余弦退火', demo: '窄山谷 f=x²+25y² 上的 SGD / 动量 / AdamW 赛跑；“的”与“熵”的两个记账本与权重衰减橡皮筋；预热加余弦退火时刻表。' },
+    { n: 10, part: 2, icon: '📈', color: COLORS.c1, title: '为什么“大力出奇迹”是一条精确的数学规律？', sub: '双下降现象与 Chinchilla 算力缩放定律（Scaling Laws）', demo: '给定算力求 Chinchilla 最优 N、D；N 个旋钮平分一道题与临界插值爆炸；双下降曲线。' },
+    { n: 11, part: 2, icon: '🧩', color: COLORS.c3, title: '怎么用一张游戏显卡微调百亿大模型？', sub: 'LoRA 低秩适配的线性代数魔术', demo: '一列乘一行拼出低秩矩阵；LoRA 显存账本；B=0 初始化的第 1 步求导与无痕合并。' },
+    { n: 12, part: 2, icon: '🌡️', color: COLORS.c2, title: '模型怎么开口说话、怎么听懂人类好恶？', sub: '温度采样、Top-p 核采样与 DPO 直接偏好优化', demo: '贪心接龙为什么会复读；温度与 Top-p 筛子；DPO 一拉一踩，损失从 0.693 降到 0.127。' },
+    { n: 13, part: 3, icon: '☕', color: COLORS.c5, title: '怎么让 AI 像画家一样从雪花噪点里画出高清大片？', sub: '去噪扩散模型（DDPM）、指路箭头（Score）与直线滑梯（流匹配 Flow Matching）', demo: '一步加雪花的闭式公式；猜雪花与指路箭头（Score）；直线滑梯（流匹配）与 CFG 引导。' },
+    { n: 14, part: 3, icon: '🔥', color: COLORS.c4, title: '怎么用神经网络一秒钟算出台风路径与流体力学？', sub: '神经算子 DeepONet 与傅里叶神经算子（FNO）', demo: '铁棒热量散开算子；FNO 的频谱截断；物理残差罚分。' },
+    { n: 15, part: 3, icon: '🩺', color: COLORS.c6, title: '怎么知道大模型是不是在“一本正经地胡说八道”？', sub: '不确定性拆解、温度校准与共形预测（Conformal Prediction）', demo: '三个同桌的熵分解与语义熵；打分除以温度 T 与可靠性图；摸底考排名画共形预测分数线。' },
+    { n: 16, part: 3, icon: '♟️', color: COLORS.c1, title: '为什么让模型“先打草稿一步步想”就能做出奥数题？', sub: '思维链（CoT）、Best-of-N 抽卡与树搜索（Test-Time Compute）', demo: '两步草稿过河（思维链的连乘账）；Best-of-N 抽卡命中率、ORM 与 PRM、多数投票；UCT 选路逐步演示。' },
   ];
   const pad2 = (n) => String(n).padStart(2, '0');
   const chapterUrl = (n) => `ch${pad2(n)}.html`;
@@ -62,7 +62,7 @@
     return `<section class="hero"><div class="hero-inner"><div>
       <div class="eyebrow">Chapter ${pad2(c.n)} · ${PARTS[c.part].no}</div>
       <h1>第 ${c.n} 章　${c.title}</h1>
-      <p>${c.sub}${/[？?！!。]$/.test(c.sub) ? '' : '。'}${c.demo}</p>
+      <p>${c.sub ? c.sub + (/[？?！!。]$/.test(c.sub) ? '' : '。') : ''}${c.demo}</p>
       ${bookRef ? `<div class="book-ref">📖 ${bookRef}</div>` : ''}
     </div><div class="chap-no">${pad2(c.n)}</div></div></section>`;
   }

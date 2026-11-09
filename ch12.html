@@ -5,20 +5,79 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>第 12 章 · 在线实验室</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="assets/lab.css">
+<link rel="stylesheet" href="assets/lab.css?v=20261110">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-<script defer src="assets/lab.js"></script>
+<script defer src="assets/lab.js?v=20261110"></script>
 <script defer src="ch12.js"></script>
 </head>
 <body data-chapter="12">
 <main class="container">
 
   <!-- ========================= 实验 1 ========================= -->
-  <section class="experiment" id="sampling" data-title="温度、Top-k 与 Top-p">
+  <section class="experiment" id="greedy" data-title="贪心复读机">
     <div class="lab-grid">
       <div class="card controls">
-        <div class="card-title"><span class="dot">1</span>解码旋钮</div>
+        <div class="card-title"><span class="dot">1</span>“我不知道”接龙</div>
+        <div class="explain small">模型已经吐出“我不知道”。书中 12.1 节的三条铁律：句尾“知道”后面，“我”45%、句号“。”40%；“知道我”后面“不”80%；“知道我不”后面“知道”95%。</div>
+        <div id="g-T"></div>
+        <div id="g-boost"></div>
+        <div class="btn-row">
+          <button class="btn" id="g-greedy">贪心接龙（只挑第 1 名）</button>
+          <button class="btn teal" id="g-sample">按温度抽签接龙</button>
+          <button class="btn ghost" id="g-many">抽 1000 句统计</button>
+        </div>
+        <div class="caption">每一步先把概率按温度变形 $p_i^{1/T}$ 再归一化（等价于打分除以 $T$），然后抽签；抽到句号“。”就结束，最多接 40 个词。</div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <div class="small" style="font-weight:650;color:var(--navy)">两步树枝：单步第 1 名 $\neq$ 整句第 1 名</div>
+        <div id="t-pa"></div>
+        <div id="t-a2"></div>
+        <div id="t-b2"></div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c4)">↻</span>当前温度下的“状态转移表”<span class="sub">琥珀色 = 贪心会选的第 1 名</span></div>
+          <div class="viz h260" id="g-table"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c5)">✎</span>接龙结果</div>
+          <div id="g-text" style="font-size:16px; line-height:1.9; min-height:3.8em; word-break:break-all"></div>
+          <div class="caption" id="g-cap"></div>
+        </div>
+        <div class="stats" id="g-stats"></div>
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--navy)">#</span>1000 句里“我不知道”复读了几遍</div>
+            <div class="viz h260" id="g-hist"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c3)">Y</span>两步树枝</div>
+            <div class="viz h260" id="t-tree"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$P(y_1,\dots,y_L\mid x)=\prod_{t=1}^{L}P(y_t\mid x,y_1,\dots,y_{t-1}),\qquad y_t^*=\operatorname*{arg\,max}_{w}P(w\mid x,y^*_{1},\dots,y^*_{t-1})$$</div>
+          <p class="small muted" style="margin-bottom:0">贪心解码只看眼前这一步谁是第 1 名。自回归模型又会把自己吐出的字喂回去，一旦绕进“我 → 不 → 知道 → 我”的环路，而且重复越多“我”的概率越高（Holtzman 等人 2019 年观察到的正反馈），就再也出不来。给第 2 名一点被抽中的机会，句子就能体面地结束。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>点“贪心接龙”：45% 的“我”只比 40% 的句号多 5 个百分点，贪心却每次都选它，一路复读到 40 个词的上限。</li>
+            <li>点“按温度抽签接龙”几次，再点“抽 1000 句统计”：$T=1$ 时绝大多数句子很快就画上句号。</li>
+            <li>把温度降到 0.3：抽签越来越像贪心，复读的句子比例明显上升；取消“重复一次就涨一截”，复读会少很多。</li>
+            <li>两步树枝：默认 A 0.6、B 0.4，A 后面最好只有 0.2、B 后面能接 0.9，整句概率 0.12 对 0.36，单步第 1 名反而输 3 倍。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 2 ========================= -->
+  <section class="experiment" id="sampling" data-title="温度与 Top-p 筛子">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">2</span>解码旋钮</div>
         <div class="small muted">选一个语境：</div>
         <div id="ctx-seg" style="margin:6px 0 2px"></div>
         <div class="explain kai" id="ctx-text"></div>
@@ -27,17 +86,17 @@
         <div id="p-s"></div>
         <div class="btn-row">
           <button class="btn" id="btn-sample">采样 20 次</button>
-          <button class="btn ghost" id="btn-greedy">贪心（$\tau\to0$）</button>
+          <button class="btn ghost" id="btn-greedy">贪心（$T\to0$）</button>
           <button class="btn ghost" id="btn-reset1">恢复默认</button>
         </div>
-        <div class="caption">处理顺序：先做 $\operatorname{Softmax}(z/\tau)$，再按 Top-k、Top-p 截断，最后在保留的词上重新归一化。Top-k 取 12、Top-p 取 1 表示不截断。</div>
+        <div class="caption">处理顺序：先除以温度做 $\operatorname{Softmax}(z/T)$，再按 Top-$K$、Top-$p$ 截断，最后在保留的词上重新归一化（书中问 3）。Top-$K$ 取 20、Top-$p$ 取 1 表示不截断。</div>
       </div>
       <div class="stack">
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--c2)">P</span>按概率排序的候选词<span class="sub">彩色 = 保留　灰色 = 截掉</span></div>
           <div class="viz h340" id="dec-bars"></div>
           <div class="legend">
-            <span><i style="background:var(--c2l);border:1px solid var(--c2)"></i>截断前 $P_i(\tau)$</span>
+            <span><i style="background:var(--c2l);border:1px solid var(--c2)"></i>截断前 $p_i(T)$</span>
             <span><i style="background:var(--c2)"></i>重新归一化后的采样概率</span>
             <span><i style="background:var(--navy)"></i>采样 20 次的频率</span>
           </div>
@@ -61,32 +120,34 @@
         </div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-          <div class="formula">$$P_i(\tau) = \frac{\exp(z_i / \tau)}{\sum_{j=1}^{|\mathcal{V}|} \exp(z_j / \tau)}, \qquad \mathcal{V}^{(p)} = \operatorname*{arg\,min}_{\mathcal{V}' \subseteq \mathcal{V}} |\mathcal{V}'| \quad \text{s.t.} \quad \sum_{i \in \mathcal{V}'} P_i(\tau) \ge p$$</div>
-          <p class="small muted">$\tau\to0^+$ 时只剩最大的 $z_{i^*}$，退化为贪心解码；$\tau\to\infty$ 时 $P_i\to 1/|\mathcal V|$，退化为均匀瞎猜。Top-k 固定保留 $k$ 个词；Top-p 的候选池大小随语境自动伸缩：模型胸有成竹时只留一个词，面对开放问题时自动放宽。</p>
+          <div class="formula">$$p_i(T) = \frac{\exp(z_i / T)}{\sum_{j=1}^{V} \exp(z_j / T)}$$</div>
+          <div class="formula">$$V^{(p)}：\text{按 } p_i(T) \text{ 从大到小累加，首次满足 } \textstyle\sum_{i \in V^{(p)}} p_i(T) \ge p \text{ 就关门}$$</div>
+          <p class="small muted">$T\to0^+$ 时只剩最大的 $z_{i^*}$，退化为贪心解码；$T\to\infty$ 时 $p_i\to 1/V$，退化为闭眼瞎抓。Top-$K$ 固定保留 $K$ 个词；Top-$p$ 的候选池大小随语境自动伸缩：模型胸有成竹时只留一个词，面对开放问题时自动放宽。</p>
           <p class="small muted">右侧玩具模型是一个手写的二元语法表（约 40 个词），每个词只给少数几个合理后继打高分，其余词（包括“香蕉、齿轮”这类离谱词）统一给很低的分。它足以复现 Holtzman 等人发现的两种退化：贪心时陷入复读，高温时滑进长尾胡言乱语。</p>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>选“中国的首都是”，把 Top-k 设为 10、Top-p 设为 1：Top-k 硬拉进 9 个陪跑词；改用 Top-p = 0.9，候选池自动缩到 1 个。</li>
-            <li>选“周末我喜欢去”：同样的 Top-p = 0.9 需要圈进多少个词？这就是“自适应伸缩”。</li>
-            <li>点“贪心”后再生成：句子很快变成“今天天气真好，今天天气真好……”的复读机。</li>
-            <li>把 $\tau$ 拉到 1.5、Top-p 设为 1 再生成，离谱词纷纷出现（$\tau=2.5$ 时几乎整段胡话）；保持 $\tau=1.5$ 但把 Top-p 调到 0.7，长尾垃圾被一刀砍掉。</li>
+            <li>选“(4, 2, 0)”：$T=1$ 时三个词是 86.7%、11.7%、1.6%；拖到 $T=0.5$ 变成 98.2%、1.8%、0.03%；拖到 $T=2$ 变成 66.5%、24.5%、9.0%（书中 12.2 节）。</li>
+            <li>选“今天天气真”（好 55%、晴 25%、棒 12%、火锅 5%、挖掘机 3%），Top-$p=0.9$：累计到“棒”时 92%，关门；门内重新归一化成 59.8%、27.2%、13.0%。</li>
+            <li>选“床前明月”：Top-$p=0.9$ 只留“光”1 个词；把 Top-$K$ 设成 5、Top-$p$ 设成 1，4 个错别字被硬拉进来。选“周末我想去”：20 个去处各 5%，Top-$p=0.9$ 圈进 18 个，Top-$K=5$ 只留 5 个。</li>
+            <li>回到“(4, 2, 0)”，Top-$p=0.9$：$T=0.5$ 只留第 1 名；$T=2$ 时 66.5% + 24.5% = 91% 才满 90%，第 2 名也被请进来（书中问 3）。</li>
+            <li>点“贪心”后再用玩具模型生成：句子很快变成复读机；把 $T$ 拉到 1.5、Top-$p$ 设为 1，离谱词纷纷出现，再把 Top-$p$ 调到 0.7，长尾垃圾被一刀砍掉。</li>
           </ol>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ========================= 实验 2 ========================= -->
-  <section class="experiment" id="dpo" data-title="DPO 偏好损失">
+  <!-- ========================= 实验 3 ========================= -->
+  <section class="experiment" id="dpo" data-title="DPO 一拉一踩">
     <div class="lab-grid">
       <div class="card controls">
-        <div class="card-title"><span class="dot">2</span>一条偏好数据</div>
+        <div class="card-title"><span class="dot">3</span>一条偏好数据</div>
         <div class="explain small">
-          <div>提问 $x$：“什么是梯度下降？”</div>
-          <div style="margin-top:4px"><span class="tag teal">$y_w$ 好回答</span>沿负梯度方向小步更新参数，直到损失不再下降。</div>
-          <div style="margin-top:4px"><span class="tag coral">$y_l$ 坏回答</span>就是一种优化方法。</div>
+          <div>提问 $x$：“有人摔倒了怎么办？”</div>
+          <div style="margin-top:4px"><span class="tag teal">$y_w$ 好回答</span>赶紧扶起来问问有没有受伤。</div>
+          <div style="margin-top:4px"><span class="tag coral">$y_l$ 差回答</span>在旁边看热闹。</div>
         </div>
         <div id="beta-s"></div>
         <div class="small muted" style="margin-top:6px">整句对数概率（可拖动，也可在右侧曲面上拖点）：</div>
@@ -95,9 +156,10 @@
         <div class="btn-row">
           <button class="btn" id="btn-step">梯度下降 1 步</button>
           <button class="btn teal" id="btn-train">连续训练</button>
-          <button class="btn ghost" id="btn-reset2">重置</button>
+          <button class="btn ghost" id="btn-reset2">重置（书中第 0 步）</button>
+          <button class="btn ghost" id="btn-book2">书中训练后</button>
         </div>
-        <div class="caption">参考模型 $\pi_{\text{ref}}$ 保持冻结。初始时 $\pi_{\boldsymbol\theta}=\pi_{\text{ref}}$，两条回答的隐式奖励相等，损失为 $\ln 2$。</div>
+        <div class="caption">参考模型 $\pi_{\text{ref}}$ 保持冻结，书中两条回答都是 0.10。初始时 $\pi_{\boldsymbol\theta}=\pi_{\text{ref}}$，隐式奖励相等，损失为 $\ln 2\approx0.693$；“书中训练后”把好回答设为 0.2718、差回答设为 0.0368，损失降到 0.127。</div>
       </div>
       <div class="stack">
         <div class="row2">
@@ -131,72 +193,10 @@
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>点“连续训练”：损失从 $\ln 2\approx0.693$ 一路下降，纠错权重 $\sigma(-\beta u)$ 越来越小，训练自动“刹车”。</li>
-            <li>在曲面上把点拖到左上角（模型把坏回答抬得比好回答还高）：权重接近 1，这正是“判断越错，权重越大”。</li>
-            <li>把 $\beta$ 从 0.1 调到 0.5：曲线变陡，同样的对数概率差带来更大的隐式奖励差。</li>
-            <li>把 $\ln\pi_{\boldsymbol\theta}(y_w)$ 和 $\ln\pi_{\boldsymbol\theta}(y_l)$ 同时减 3：两个都变小了，但差值不变，损失纹丝不动。</li>
-          </ol>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ========================= 实验 3 ========================= -->
-  <section class="experiment" id="speculative" data-title="投机采样">
-    <div class="lab-grid">
-      <div class="card controls">
-        <div class="card-title"><span class="dot">3</span>小模型打草稿，大模型批改</div>
-        <div class="explain kai">“我今天中午想吃<b>＿＿</b>”</div>
-        <div class="small muted">草稿模型 $q$ 的几种性格（也可直接在右图拖动琥珀色柱子）：</div>
-        <div id="spec-seg" style="margin:6px 0"></div>
-        <div id="gamma-s"></div>
-        <div id="cost-s"></div>
-        <div class="btn-row">
-          <button class="btn teal" id="btn-mc">蒙特卡洛验证</button>
-        </div>
-        <div class="caption">一次迭代：$q$ 连续猜 $\gamma$ 个词，$p$ 用 1 次并行前向批改。成本以“大模型前向 1 次”为单位，小模型一次前向的成本为 $c$。</div>
-      </div>
-      <div class="stack">
-        <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c1)">p</span>目标分布 $p$、草稿分布 $q$ 与残差分布<span class="sub">数字 = 接受率 $\min(1,p/q)$</span></div>
-          <div class="viz h300" id="spec-bars"></div>
-          <div class="legend">
-            <span><i style="background:var(--c1)"></i>大模型 $p(x)$</span>
-            <span><i style="background:var(--c2)"></i>草稿 $q(x)$（可拖动）</span>
-            <span><i style="background:var(--c4)"></i>残差 $p_{\text{residual}}(x)$</span>
-          </div>
-        </div>
-        <div class="stats" id="stats-spec"></div>
-        <div class="row2">
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--c3)">γ</span>草稿长度与加速比</div>
-            <div class="viz h260" id="spec-speed"></div>
-            <div class="legend">
-              <span><i style="background:var(--c1)"></i>每次迭代产出词数</span>
-              <span><i style="background:var(--c3)"></i>加速比</span>
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-title"><span class="dot" style="background:var(--teal)">MC</span>修正拒绝采样的输出分布</div>
-            <div class="viz h260" id="spec-mc"></div>
-            <div class="caption" id="mc-cap">点“蒙特卡洛验证”：按“接受或从残差补抽”的规则真实抽样，看看输出频率是否等于 $p$。</div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-          <div class="formula">$$\mathbb{P}(\text{接受 } \tilde{x}) = \min\!\Big(1, \frac{p(\tilde{x})}{q(\tilde{x})}\Big), \qquad p_{\text{residual}}(x) = \frac{\max(0,\, p(x) - q(x))}{\sum_{x'} \max(0,\, p(x') - q(x'))}$$</div>
-          <div class="formula">$$\mathbb{P}(\text{输出 } x) = \min\big(q(x), p(x)\big) + \max\big(0, p(x)-q(x)\big) = p(x)$$</div>
-          <div class="formula">$$\alpha=\sum_x\min\big(p(x),q(x)\big)=1-D_{\text{TV}}(p,q)$$</div>
-          <div class="formula">$$\mathbb{E}[\text{每次迭代词数}] = \frac{1 - \alpha^{\gamma+1}}{1 - \alpha},\qquad \text{加速比}=\frac{1-\alpha^{\gamma+1}}{(1-\alpha)(\gamma c+1)}$$</div>
-          <p class="small muted">词数公式假设每个位置的接受事件独立、接受率都是 $\alpha$：前 $i$ 个都被接受的概率是 $\alpha^i$，全部接受时大模型还能白送 1 个词。加速比公式来自 Leviathan 等人（2023），分母是一次迭代的耗时：$\gamma$ 次小模型前向加 1 次大模型前向。</p>
-        </div>
-        <div class="try">
-          <h3>🧪 试一试</h3>
-          <ol>
-            <li>默认设置下 $\alpha=0.83$。按书中的 $\alpha\approx0.8$、$\gamma=5$ 估算，每次迭代约产出 $3.69$ 个词，看看右上图的读数。</li>
-            <li>选“过度自信”：$q$ 把宝全押在“火锅”上，被大模型频繁打回，$\alpha$ 掉到多少？最佳 $\gamma$ 怎么变？</li>
-            <li>点“蒙特卡洛验证”，再换成“南辕北辙”重做一次：无论 $q$ 多离谱，输出频率都贴着 $p$，变的只有速度。</li>
-            <li>把成本比 $c$ 调到 0.3：小模型不够“小”，加速比曲线很快掉头，$\gamma$ 不是越大越好。</li>
+            <li>默认是书中 12.4 节的设定：$\beta=1$，$p_{\text{ref}}=p_{\boldsymbol\theta}=0.10$，损失 $\ln2\approx0.693$。点“书中训练后”：隐式奖励变成 $+1$ 与 $-1$，奖励差 2，损失 $\ln(1+e^{-2})\approx0.127$。</li>
+            <li>点“连续训练”：损失一路下降，纠错权重 $\sigma(-\beta u)$ 越来越小，训练自动“刹车”。</li>
+            <li>在曲面上把点拖到左上角（模型把差回答抬得比好回答还高）：权重接近 1，这正是“站错队时惩罚最重”（练习 12.2：$u=-2$ 时 0.881，$u=4$ 时 0.018）。</li>
+            <li>把两个 $\ln\pi_{\boldsymbol\theta}$ 同时减 1：两个概率都变小了，但差值不变，损失纹丝不动，这就是书中问 4 说的“好回答也被顺带拉下水”。</li>
           </ol>
         </div>
       </div>

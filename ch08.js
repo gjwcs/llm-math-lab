@@ -1,7 +1,7 @@
 /* 第 8 章：稀疏混合专家与状态空间模型：交互实验 */
 (function () {
   const { COLORS: C, M } = LAB;
-  LAB.page({ bookRef: '对应书中 §8.2 MoE 路由与负载均衡 · §8.3 SSM / Mamba · 4 专家 Top-2 手算算例 · 复杂度对比表' });
+  LAB.page({ bookRef: '对应书中 §8.1 专科医院分诊台 · §8.2 负载均衡与动态补贴 · §8.3 Mamba 随身备忘录 · §8.4 纸笔演练 · §8.5 复杂度对比表' });
 
   const $ = (s) => document.querySelector(s);
   const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
@@ -23,8 +23,8 @@
   let B = null, Rt = null;
   function makeBatch() {
     if (st.book) {
-      const probs = [[0.5, 0.3, 0.1, 0.1], [0.6, 0.1, 0.2, 0.1]];
-      return { probs, logits: probs.map((r) => r.map(Math.log)) };
+      const logits = [[3, 3, -5, -8]]; // 书中 8.1 节：x=(2,1) 的分诊打分
+      return { logits, probs: logits.map((z) => M.softmax(z)) };
     }
     const R = LAB.rng(100 + st.batch * 131 + st.E * 7 + st.T), E = st.E;
     const logits = M.range(st.T).map(() => M.range(E).map((i) => st.skew * (1 - (2 * i) / (E - 1)) + R.normal()));
@@ -41,7 +41,7 @@
       idx.forEach((i) => counts[i]++);
       p.forEach((v, i) => (Psum[i] += v));
     });
-    const f = counts.map((c) => c / T), P = Psum.map((s) => s / T);
+    const f = counts.map((c) => c / (T * k)), P = Psum.map((s) => s / T);
     const L = E * M.sum(f.map((v, i) => v * P[i]));
     const mean = (T * k) / E;
     return { E, T, k, counts, f, P, L, picks, gates, maxLoad: Math.max(...counts) / mean, idle: counts.filter((c) => c === 0).length };
@@ -53,7 +53,7 @@
     B = makeBatch(); Rt = route(B);
     const mean = (Rt.T * Rt.k) / Rt.E;
     st.bias = st.bias.map((b, i) => b + st.gamma * Math.sign(mean - Rt.counts[i]));
-    st.hist.push({ load: Rt.maxLoad, L: Rt.L / Rt.k });
+    st.hist.push({ load: Rt.maxLoad, L: Rt.L });
     if (st.hist.length > 200) st.hist.shift();
     draw1();
   }
@@ -118,13 +118,13 @@
   function pick(x) { const g = gridCv._geo; if (!g) return; const j = Math.floor((x - g.l) / g.cw); if (j >= 0 && j < g.T && j !== st.sel) { st.sel = j; draw1(); } }
   const loadCv = LAB.canvas('#m-load', (ctx, w, h) => {
     if (!Rt) return;
-    const E = Rt.E, ymax = Math.max(Math.max(...Rt.f), Math.max(...Rt.P), (1.6 * Rt.k) / E) * 1.12;
+    const E = Rt.E, ymax = Math.max(Math.max(...Rt.f), Math.max(...Rt.P), 1.6 / E) * 1.12;
     const P = new LAB.Plot(ctx, w, h, { xmin: 0.4, xmax: E + 0.6, ymin: 0, ymax, xtickValues: M.range(E).map((i) => i + 1), xfmt: (v) => 'E' + v, ylabel: '比例', pad: { l: 44, r: 10, t: 12, b: 30 } }).axes();
     const bw = Math.min(16, (P.tx(2) - P.tx(1)) * 0.36);
     const dx = P.ix(P.tx(1) + bw * 0.55) - 1;
     P.bars(M.range(E).map((i) => i + 1 - dx), Rt.f, C.c2, bw);
     P.bars(M.range(E).map((i) => i + 1 + dx), Rt.P, C.c1, bw);
-    P.hline(Rt.k / E, C.c2, [5, 4], 1.2); P.hline(1 / E, C.c1, [5, 4], 1.2);
+    P.hline(1 / E, C.slate, [5, 4], 1.2);
   });
   const histCv = LAB.canvas('#m-hist', (ctx, w, h) => {
     const H = st.hist, n = Math.max(20, H.length);
@@ -137,23 +137,41 @@
     } else P.text(n / 2, (0.8 + ymax) / 2, '点“自动更新偏置”开始', C.slate, 'center');
   });
   const m1 = LAB.stat('#m-stats', '$\\mathcal L_{\\text{aux}}=E\\sum_i f_iP_i$', 'coral');
-  const m2 = LAB.stat('#m-stats', '理想最小值 $k$', 'leaf');
+  const m2 = LAB.stat('#m-stats', '理想最小值', 'leaf');
   const m3 = LAB.stat('#m-stats', '最大负载 / 平均负载', 'amber');
   const m4 = LAB.stat('#m-stats', '一单没接的专家', 'plum');
   function draw1() {
-    m1.set(Rt.L.toFixed(3)); m2.set(String(Rt.k)); m3.set(Rt.maxLoad.toFixed(2) + '<small>×</small>'); m4.set(Rt.idle + '<small>/ ' + Rt.E + '</small>');
+    m1.set(Rt.L.toFixed(3)); m2.set('1'); m3.set(Rt.maxLoad.toFixed(2) + '<small>×</small>'); m4.set(Rt.idle + '<small>/ ' + Rt.E + '</small>');
     const t = st.sel, p = B.probs[t], idx = Rt.picks[t], g = Rt.gates[t];
     const biasTxt = st.bias.some((b) => b !== 0) ? `；当前偏置 $b=(${st.bias.map((b) => b.toFixed(2)).join(',\\,')})$` : '';
     $('#m-token').innerHTML = `词元 ${t + 1}：选中 ${idx.map((i) => 'E' + (i + 1)).join('、')}，门控权重 ` + LAB.tex(idx.map((i, q) => `g_{${t + 1},${i + 1}}=\\tfrac{${p[i].toFixed(2)}}{${M.sum(idx.map((j) => p[j])).toFixed(2)}}=${g[q].toFixed(3)}`).join(',\\;')) + biasTxt;
     LAB.renderMath($('#m-token'));
-    let rows = `<tr><th>专家 $i$</th><th>接单数 $c_i$</th><th>$f_i=c_i/T$</th><th>$P_i$</th><th>$f_i\\cdot P_i$</th><th>对 $P_i$ 的惩罚系数 $Ef_i$</th></tr>`;
+    let rows = `<tr><th>专家 $i$</th><th>接单数 $c_i$</th><th>$f_i=c_i/(Tk)$</th><th>$P_i$</th><th>$f_i\\cdot P_i$</th><th>对 $P_i$ 的惩罚系数 $Ef_i$</th></tr>`;
     for (let i = 0; i < Rt.E; i++) rows += `<tr><td>E${i + 1}</td><td>${Rt.counts[i]}</td><td>${Rt.f[i].toFixed(3)}</td><td>${Rt.P[i].toFixed(3)}</td><td>${(Rt.f[i] * Rt.P[i]).toFixed(4)}</td><td>${(Rt.E * Rt.f[i]).toFixed(2)}</td></tr>`;
     const sfp = M.sum(Rt.f.map((v, i) => v * Rt.P[i]));
-    rows += `<tr><td><b>合计</b></td><td>${Rt.T * Rt.k}</td><td>${M.sum(Rt.f).toFixed(2)} $=k$</td><td>${M.sum(Rt.P).toFixed(2)}</td><td>${sfp.toFixed(4)}</td><td>$\\mathcal L_{\\text{aux}}=${Rt.E}\\times${sfp.toFixed(4)}=${Rt.L.toFixed(3)}$</td></tr>`;
+    rows += `<tr><td><b>合计</b></td><td>${Rt.T * Rt.k}</td><td>${M.sum(Rt.f).toFixed(2)}</td><td>${M.sum(Rt.P).toFixed(2)}</td><td>${sfp.toFixed(4)}</td><td>$\\mathcal L_{\\text{aux}}=${Rt.E}\\times${sfp.toFixed(4)}=${Rt.L.toFixed(3)}$</td></tr>`;
     $('#m-table').innerHTML = rows; LAB.renderMath($('#m-table'));
     gridCv.redraw(); loadCv.redraw(); histCv.redraw();
   }
   refresh1();
+
+  // 2 位医生的拥堵罚款 L = 2(P1^2 + (1-P1)^2)（书中 8.2 节）
+  const stP = { P1: 0.9 };
+  LAB.slider('#p-P1', { label: '1 号医生的份额 $P_1=f_1$', min: 0, max: 1, step: 0.01, value: stP.P1, fmt: (v) => v.toFixed(2), onInput: (v) => { stP.P1 = v; updP(); } });
+  const Lp = (p) => 2 * (p * p + (1 - p) * (1 - p));
+  const pPlot = LAB.canvas('#p-plot', (ctx, w, h) => {
+    const P = new LAB.Plot(ctx, w, h, { xmin: 0, xmax: 1, ymin: 0.8, ymax: 2.1, xtickValues: [0, 0.1, 0.5, 0.9, 1], ytickValues: [1, 1.64, 2], xlabel: 'P₁', pad: { l: 44, r: 12, t: 12, b: 36 } }).axes();
+    P.hline(1, C.slate, [4, 4], 1);
+    P.fn(Lp, C.c5, 2.6);
+    P.points([0.5], [1], C.c3, 4.5, '#fff'); P.points([0.9, 0.1], [1.64, 1.64], C.c2, 4.5, '#fff'); P.points([0, 1], [2, 2], C.c4, 4.5, '#fff');
+    P.points([stP.P1], [Lp(stP.P1)], C.navy, 6, '#fff');
+  });
+  function updP() {
+    const p = stP.P1;
+    $('#p-formula').innerHTML = LAB.tex(`\\mathcal L_{\\text{aux}}=2\\times(${p.toFixed(2)}^2+${(1 - p).toFixed(2)}^2)=${Lp(p).toFixed(2)}`, true);
+    pPlot.redraw();
+  }
+  updP();
 
   /* ================= 实验 2：SSM 选择性记忆 ================= */
   const TT = 96;
@@ -250,6 +268,34 @@
     inCv.redraw(); stCv.redraw(); kCv.redraw();
   }
   upd2();
+
+  // 书中 4 词算例：x=(5,100,-80,2)，Mamba (a_t,b_t)=(0.2,1),(1,0),(1,0),(0.8,1)；对照固定系数 (a,b)
+  const BK = { xs: [5, 100, -80, 2], words: ['密码', '嗡嗡', '咔嚓', '解锁'], as: [0.2, 1, 1, 0.8], bs: [1, 0, 0, 1], a: 0.8, b: 1 };
+  LAB.slider('#b-a', { label: '固定保留系数 $a$', min: 0, max: 1, step: 0.01, value: BK.a, fmt: (v) => v.toFixed(2), onInput: (v) => { BK.a = v; updB(); } });
+  LAB.slider('#b-b', { label: '固定写入系数 $b$', min: 0, max: 1, step: 0.01, value: BK.b, fmt: (v) => v.toFixed(2), onInput: (v) => { BK.b = v; updB(); } });
+  const runRec = (as, bs) => { let hh = 0; return BK.xs.map((x, t) => (hh = as[t] * hh + bs[t] * x)); };
+  let BR = null;
+  const bPlot = LAB.canvas('#b-plot', (ctx, w, h) => {
+    if (!BR) return;
+    const all = BR.sel.concat(BR.fix), m = Math.max(8, ...all.map(Math.abs)) * 1.12;
+    const P = new LAB.Plot(ctx, w, h, { xmin: 0, xmax: 4, ymin: -m, ymax: m, xtickValues: [0, 1, 2, 3, 4], xlabel: '步 t', pad: { l: 44, r: 12, t: 12, b: 36 } }).axes();
+    P.hline(0, '#9aa5b1', null, 1);
+    const ts = [0, 1, 2, 3, 4];
+    P.line(ts, [0].concat(BR.fix), C.c4, 2.2); P.points(ts, [0].concat(BR.fix), C.c4, 4, '#fff');
+    P.line(ts, [0].concat(BR.sel), C.c3, 2.6); P.points(ts, [0].concat(BR.sel), C.c3, 4.5, '#fff');
+  });
+  function updB() {
+    BR = { sel: runRec(BK.as, BK.bs), fix: runRec(BK.xs.map(() => BK.a), BK.xs.map(() => BK.b)) };
+    const n = (v) => (Math.abs(v - Math.round(v)) < 1e-9 ? String(Math.round(v)) : v.toFixed(2));
+    let rows = `<tr><th></th>${BK.words.map((wd, t) => `<th>${wd} $x_${t + 1}=${BK.xs[t]}$</th>`).join('')}</tr>`;
+    rows += `<tr><td>Mamba：$(a_t,b_t)$</td>${BK.as.map((a, t) => `<td>$(${a},\\ ${BK.bs[t]})$</td>`).join('')}</tr>`;
+    rows += `<tr><td><b>Mamba：$h_t$</b></td>${BR.sel.map((v) => `<td><b>$${n(v)}$</b></td>`).join('')}</tr>`;
+    rows += `<tr><td>固定 $(a,b)=(${BK.a.toFixed(2)},\\ ${BK.b.toFixed(2)})$：$h_t$</td>${BR.fix.map((v) => `<td>$${n(v)}$</td>`).join('')}</tr>`;
+    rows += `<tr><td>“密码”留在 $h_4$ 里的份额</td><td colspan="2">Mamba：$1\\times1\\times0.8\\times5=${(0.8 * 5).toFixed(2)}$</td><td colspan="2">固定：$a^3b\\times5=${(Math.pow(BK.a, 3) * BK.b * 5).toFixed(2)}$</td></tr>`;
+    $('#b-table').innerHTML = rows; LAB.renderMath($('#b-table'));
+    bPlot.redraw();
+  }
+  updB();
 
   /* ================= 实验 3：复杂度墙与激活参数 ================= */
   const W = { lt: 17, d: 4096, lw: 12, N: 16, preset: 0, E: 256, k: 8 };

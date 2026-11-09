@@ -1,7 +1,7 @@
 /* 第 15 章：大模型的不确定性量化：交互实验 */
 (function () {
   const { COLORS: C, M } = LAB;
-  LAB.page({ bookRef: '对应书中 §15.2 全方差与互信息分解 · §15.3 ECE 与共形预测 · §15.4 语义熵与温度校准 · §15.5 手算算例' });
+  LAB.page({ bookRef: '对应书中 §15.1 三个同桌与熵分解 · §15.2 温度校准与 ECE · §15.3 共形预测与 APS · 问 15.3 语义熵 · 练习 15.1–15.2' });
 
   const $ = (s) => document.querySelector(s);
   const FONT = getComputedStyle(document.body).getPropertyValue('--font');
@@ -109,7 +109,14 @@
       pts.forEach((p, i) => { P.points([p[0]], [p[1]], C.c3, 4); P.text(p[0], p[1], ' ' + i, C.leaf, 'left', 'bottom', '600 11px Avenir Next, sans-serif'); });
     }
   });
+  function bookCard() {
+    const T = cT.get(), d = 8 / T, pA = 1 / (1 + Math.exp(-d));
+    $('#c-book').innerHTML = `<div class="formula">$$\\frac{\\mathbf z}{T}=\\Big(\\frac{10}{${T.toFixed(2)}},\\ \\frac{2}{${T.toFixed(2)}}\\Big)=(${(10 / T).toFixed(2)},\\ ${(2 / T).toFixed(2)}),\\qquad \\hat p_A=\\frac{e^{${d.toFixed(2)}}}{e^{${d.toFixed(2)}}+1}=${(pA * 100).toFixed(2)}\\%$$</div>` +
+      `<p class="muted" style="margin:6px 0 0">书中：$T=1$ 时 $99.97\\%$，$T=4$ 时 $88.1\\%$；无论 $T$ 取多少，第一名都是 A。两筐考题的 ECE：$\\tfrac{60}{100}\\times0.20+\\tfrac{40}{100}\\times0.05=0.14$。</p>`;
+    LAB.renderMath($('#c-book'));
+  }
   function update1() {
+    bookCard();
     EV = evalTest(cT.get());
     cst.e.set(`${(EV.ece * 100).toFixed(1)}<small>%</small>`); cst.n.set(EV.nll.toFixed(3));
     cst.a.set(`${(EV.A * 100).toFixed(1)}<small>%</small>`); cst.c.set(`${(EV.Cf * 100).toFixed(1)}<small>%</small>`);
@@ -141,12 +148,12 @@
   update1();
 
   /* ================= 实验 2：共形预测 ================= */
-  const HAND = [0.05, 0.08, 0.12, 0.15, 0.22, 0.30, 0.41, 0.55, 0.78];
-  const TESTS = [{ name: '书中例子', p: [0.65, 0.25, 0.07, 0.03] }, { name: '拿不准', p: [0.40, 0.33, 0.17, 0.10] }, { name: '很有把握', p: [0.93, 0.04, 0.02, 0.01] }];
+  const HAND = [0.02, 0.05, 0.08, 0.12, 0.15, 0.20, 0.25, 0.31, 0.40];
+  const TESTS = [{ name: '书中第 10 号病人', p: [0.65, 0.62, 0.20, 0.05] }, { name: '胸片模糊', p: [0.72, 0.66, 0.61, 0.30] }, { name: '胸片清晰', p: [0.95, 0.12, 0.05, 0.02] }];
   let testI = 0;
   const aS = LAB.slider('#cp-alpha', { label: '$\\alpha$（目标覆盖率 $1-\\alpha$）', min: 0.01, max: 0.5, step: 0.01, value: 0.1, fmt: (v) => `${v.toFixed(2)}（${Math.round((1 - v) * 100)}%）`, onInput: () => { trials = []; update2(); } });
   LAB.segmented('#cp-test', TESTS.map((t) => t.name), 0, (i) => { testI = i; update2(); });
-  const nS = LAB.slider('#cp-n', { label: '校准集大小 $n$', min: 10, max: 1000, step: 10, value: 100, onInput: () => { trials = []; update2(); } });
+  const nS = LAB.slider('#cp-n', { label: '校准集大小 $n$', min: 9, max: 999, step: 10, value: 99, onInput: () => { trials = []; update2(); } });
   const mOf = (n, a) => Math.ceil((n + 1) * (1 - a) - 1e-9);
   const qOf = (sorted, a) => { const m = mOf(sorted.length, a); return m > sorted.length ? Infinity : sorted[m - 1]; };
   // 模拟池：s = 2.5、T = 1 的盲目自信模型
@@ -164,7 +171,7 @@
   const cpRun = anim('conformal', () => { for (let k = 0; k < 10 && trials.length < 500; k++) oneTrial(); drawSim(); return trials.length < 500; }, () => { $('#cp-run').innerHTML = '▶ 重复 500 次试验'; });
   $('#cp-run').onclick = () => { if (cpRun.running) { cpRun.stop(); return; } if (trials.length >= 500) trials = []; cpRun.start(); $('#cp-run').innerHTML = '❚❚ 暂停'; };
   $('#cp-clear').onclick = () => { cpRun.stop(); trials = []; drawSim(); };
-  const cps = { m: LAB.stat('#cp-stats', '秩 $m$'), q: LAB.stat('#cp-stats', '阈值 $\\hat q$', 'coral'), sz: LAB.stat('#cp-stats', '平均集合大小', 'amber'), cov: LAB.stat('#cp-stats', '实测覆盖率（累计）', 'leaf') };
+  const cps = { m: LAB.stat('#cp-stats', '名次 $k$'), q: LAB.stat('#cp-stats', '阈值 $\\hat q$', 'coral'), sz: LAB.stat('#cp-stats', '平均集合大小', 'amber'), cov: LAB.stat('#cp-stats', '实测覆盖率（累计）', 'leaf') };
   const hand = LAB.canvas('#cp-hand', (ctx, w, h) => {
     const a = aS.get(), n = HAND.length, m = mOf(n, a), q = m > n ? Infinity : HAND[m - 1], tp = TESTS[testI].p;
     const top = Math.round(h * 0.4);
@@ -181,9 +188,9 @@
       ctx.restore();
     });
     ctx.save(); ctx.fillStyle = C.ink; ctx.font = '12px ' + FONT; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.fillText(w < 560 ? '校准分数 s₍ᵢ₎' : `校准分数 s₍ᵢ₎　m = ⌈10 × ${(1 - a).toFixed(2)}⌉ = ${m}`, P1.x0, 4); ctx.restore();
+    ctx.fillText(w < 560 ? '惊讶罚分 s₍ᵢ₎' : `惊讶罚分 s₍ᵢ₎　k = ⌈10 × ${(1 - a).toFixed(2)}⌉ = ${m}`, P1.x0, 4); ctx.restore();
     if (isFinite(q)) { ctx.save(); ctx.strokeStyle = C.coral; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(P1.tx(q), P1.ty(0.3) - 6); ctx.lineTo(P1.tx(q), P1.ty(0.3) + 10); ctx.stroke(); ctx.fillStyle = C.coral; ctx.font = NUM; ctx.textAlign = 'right'; ctx.textBaseline = 'top'; ctx.fillText(`q̂ = s₍${m}₎ = ${q}`, P1.x1, 4); ctx.restore(); }
-    else { ctx.save(); ctx.fillStyle = C.coral; ctx.font = NUM; ctx.textAlign = 'right'; ctx.textBaseline = 'top'; ctx.fillText('m > n：q̂ = +∞', P1.x1, 4); ctx.restore(); }
+    else { ctx.save(); ctx.fillStyle = C.coral; ctx.font = NUM; ctx.textAlign = 'right'; ctx.textBaseline = 'top'; ctx.fillText('k > n：q̂ = +∞', P1.x1, 4); ctx.restore(); }
     // 下：测试题概率与阈值
     const thr = isFinite(q) ? 1 - q : 0;
     ctx.save(); ctx.translate(0, top);
@@ -233,8 +240,8 @@
     // 书中手算
     const hm = mOf(9, a), hq = hm > 9 ? Infinity : HAND[hm - 1], tp = TESTS[testI].p;
     const set = tp.map((p, i) => (isFinite(hq) ? (p >= 1 - hq - 1e-12 ? 'ABCD'[i] : null) : 'ABCD'[i])).filter(Boolean);
-    $('#cp-m').textContent = `m = ${hm}`;
-    $('#cp-hand-cap').innerHTML = `$m=\\lceil (9+1)(1-${a.toFixed(2)})\\rceil=${hm}$，` + (isFinite(hq) ? `阈值 $\\hat q=s_{(${hm})}=${hq}$，只收概率 $\\ge ${(1 - hq).toFixed(2)}$ 的答案` : `$m&gt;9$，阈值为 $+\\infty$，所有答案都收进集合`) + `：$\\mathcal C(x_{\\text{test}})=\\{${set.join(',')}\\}$。`;
+    $('#cp-m').textContent = `k = ${hm}`;
+    $('#cp-hand-cap').innerHTML = `$k=\\lceil (9+1)(1-${a.toFixed(2)})\\rceil=${hm}$，` + (isFinite(hq) ? `分数线 $\\hat q=s_{(${hm})}=${hq}$，只收概率 $\\ge ${(1 - hq).toFixed(2)}$ 的病` : `$k&gt;9$，阈值为 $+\\infty$，所有病都写进诊断单`) + `：$\\mathcal C(x_{10})=\\{${set.join(',')}\\}$。`;
     LAB.renderMath($('#cp-hand-cap'));
     // 大规模
     let sz = 0; for (let i = 10000; i < 12000; i++) { let c = 0; for (let j = 0; j < K; j++) if (1 - PP[i * K + j] <= q) c++; sz += c; }
@@ -343,13 +350,13 @@
 
   // ---- 两位专家的熵分解 ----
   const Hb = (p) => -(p > 0 ? p * Math.log(p) : 0) - (p < 1 ? (1 - p) * Math.log(1 - p) : 0);
-  const dS = LAB.slider('#u-exp-s', { label: '专家分歧度 $d$', min: 0, max: 1, step: 0.01, value: 0.8, fmt: (v) => v.toFixed(2), onInput: () => expCv.redraw() });
+  const dS = LAB.slider('#u-exp-s', { label: '同桌分歧度 $d$（三人投 $0.5+d,\\ 0.5-d,\\ 0.5$）', min: 0, max: 0.5, step: 0.01, value: 0.4, fmt: (v) => v.toFixed(2), onInput: () => expCv.redraw() });
   const expCv = LAB.canvas('#u-exp', (ctx, w, h) => {
-    const d = dS.get(), e1 = [0.5 + d / 2, 0.5 - d / 2], e2 = [0.5 - d / 2, 0.5 + d / 2], avg = [0.5, 0.5];
-    const tot = Math.LN2, ale = (Hb(e1[0]) + Hb(e2[0])) / 2, epi = tot - ale;
+    const d = dS.get(), e1 = [0.5 + d, 0.5 - d], e2 = [0.5 - d, 0.5 + d], e3 = [0.5, 0.5], avg = [0.5, 0.5];
+    const tot = Math.LN2, ale = (Hb(e1[0]) + Hb(e2[0]) + Hb(0.5)) / 3, epi = tot - ale, vr = (2 * d * d) / 3;
     const top = h - 70;
-    const P = new LAB.Plot(ctx, w, top, { xmin: -0.6, xmax: 8.6, ymin: 0, ymax: 1, xtickValues: [], yticks: 2, pad: { l: 32, r: 8, t: 8, b: 22 } }).axes();
-    [[e1, 0, '专家 1'], [e2, 3, '专家 2'], [avg, 6, '平均']].forEach(([p, x0, lab]) => {
+    const P = new LAB.Plot(ctx, w, top, { xmin: -0.6, xmax: 11.6, ymin: 0, ymax: 1, xtickValues: [], yticks: 2, pad: { l: 32, r: 8, t: 8, b: 22 } }).axes();
+    [[e1, 0, '同桌 1'], [e2, 3, '同桌 2'], [e3, 6, '同桌 3'], [avg, 9, '平均']].forEach(([p, x0, lab]) => {
       P.bars([x0 + 0.5, x0 + 1.5], p, [C.c1, C.c2], (P.tx(1) - P.tx(0)) * 0.7);
       P.text(x0 + 1, -0.02, lab, C.ink, 'center', 'top', '12px ' + FONT);
     });
@@ -359,22 +366,22 @@
     ctx.fillStyle = C.c5; ctx.fillRect(x0, y, epi * sc, 20);
     ctx.fillStyle = C.c2; ctx.fillRect(x0 + epi * sc, y, ale * sc, 20);
     ctx.font = '600 12px ' + FONT; ctx.textBaseline = 'top'; ctx.textAlign = 'left';
-    ctx.fillStyle = C.plum; ctx.fillText(`认知 ${epi.toFixed(3)}`, x0, y + 26);
-    ctx.fillStyle = C.amber; ctx.textAlign = 'right'; ctx.fillText(`偶然 ${ale.toFixed(3)}`, x1, y + 26);
+    ctx.fillStyle = C.plum; ctx.fillText(`分歧 ${epi.toFixed(3)}`, x0, y + 26);
+    ctx.fillStyle = C.amber; ctx.textAlign = 'right'; ctx.fillText(`固有 ${ale.toFixed(3)}`, x1, y + 26);
     ctx.fillStyle = C.ink; ctx.textAlign = 'center'; ctx.font = '12px ' + FONT; ctx.fillText('总熵 ln 2 ≈ 0.693', (x0 + x1) / 2, y + 26);
     ctx.restore();
-    $('#u-exp-cap').innerHTML = d < 0.05 ? '两位专家都说“五五开”：没有分歧，全部是偶然不确定性。' : d > 0.95 ? '两位专家各自笃定却互相矛盾：全部是认知不确定性，这正是幻觉报警信号。' : 'A 蓝 B 琥珀。平均分布始终是五五开，总熵不变，但它在“专家分歧”和“各自纠结”之间的分配随 $d$ 改变。';
+    $('#u-exp-cap').innerHTML = `分歧方差 $=\\frac{(${(0.5 + d).toFixed(2)}-0.5)^2+(${(0.5 - d).toFixed(2)}-0.5)^2+0}{3}=${vr.toFixed(4)}$。` + (d < 0.005 ? '三人都说五五开（抛硬币）：没有分歧，全部是题目固有的模糊。' : 'A 蓝 B 琥珀。平均始终是五五开、总熵不变，变的是“各自犹豫”和“互相吵架”之间的分配。书中冰岛语题对应 $d=0.4$。');
     LAB.renderMath($('#u-exp-cap'));
   });
 
   // ---- 语义熵 ----
   const CL_COL = [C.teal, C.coral, C.amber, C.plum];
   const SCEN = [
-    [['巴黎', 0.4, 0], ['法国的首都是巴黎', 0.4, 0], ['它是浪漫之都巴黎', 0.2, 0]],
-    [['巴黎', 0.30, 0], ['伦敦', 0.25, 1], ['柏林', 0.20, 2], ['法国的首都是巴黎', 0.15, 0], ['是里昂', 0.10, 3]],
+    [['1080 年', 0.2, 0], ['元丰三年，即公元 1080 年', 0.2, 0], ['公元 1080 年', 0.2, 0], ['1080 年（元丰三年）', 0.2, 0], ['元丰三年', 0.2, 0]],
+    [['1075 年', 0.2, 0], ['1082 年', 0.2, 1], ['1090 年', 0.2, 2], ['1082 年', 0.2, 1], ['1078 年', 0.2, 3]],
   ];
   let ans = SCEN[0].map((r) => r.slice());
-  LAB.segmented('#se-seg', ['书中例子', '答案飘忽不定'], 0, (i) => { ans = SCEN[i].map((r) => r.slice()); renderSE(); });
+  LAB.segmented('#se-seg', ['模型真懂', '模型在瞎编'], 0, (i) => { ans = SCEN[i].map((r) => r.slice()); renderSE(); });
   function renderSE() {
     $('#se-list').innerHTML = ans.map((r, i) => `<div class="se-row"><span class="txt">“${r[0]}”</span><span class="p">${r[1].toFixed(2)}</span><button class="se-chip" data-i="${i}" style="background:${CL_COL[r[2]]}">簇 ${r[2] + 1}</button></div>`).join('');
     $('#se-list').querySelectorAll('.se-chip').forEach((b) => { b.onclick = () => { const i = +b.dataset.i; ans[i][2] = (ans[i][2] + 1) % 4; renderSE(); }; });
@@ -389,8 +396,8 @@
     ans.forEach((r, i) => { P.bars([i], [r[1]], LAB.mix(CL_COL[r[2]], '#ffffff', 0.25), bw); });
     pc.forEach((p, k) => { if (p > 0) P.bars([n + gap + k], [p], CL_COL[k], bw); P.text(n + gap + k, -0.02, p > 0 ? '簇' + (k + 1) : '', C.slate, 'center', 'top', '11px ' + FONT); });
     ans.forEach((r, i) => P.text(i, -0.02, String(i + 1), C.slate, 'center', 'top', '11px ' + FONT));
-    P.text((n - 1) / 2, 1.13, `按字面：H = ${H.toFixed(3)}`, C.navy, 'center', 'bottom', NUM);
-    P.text(n + gap + 1.5, 1.13, `按语义：SE = ${SE.toFixed(3)}`, SE > 0.3 ? C.coral : C.leaf, 'center', 'bottom', NUM);
+    P.text((n - 1) / 2, 1.13, `字面 H = ${H.toFixed(3)}`, C.navy, 'center', 'bottom', NUM);
+    P.text(n + gap + 1.5, 1.13, `语义 SE = ${SE.toFixed(3)}`, SE > 0.3 ? C.coral : C.leaf, 'center', 'bottom', NUM);
   });
   renderSE();
 })();

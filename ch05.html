@@ -5,56 +5,61 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>第 5 章 · 在线实验室</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="assets/lab.css">
+<link rel="stylesheet" href="assets/lab.css?v=20261110">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-<script defer src="assets/lab.js"></script>
+<script defer src="assets/lab.js?v=20261110"></script>
 <script defer src="ch05.js"></script>
 </head>
 <body data-chapter="5">
 <main class="container">
 
   <!-- ========================= 实验 1 ========================= -->
-  <section class="experiment" id="heatmap" data-title="注意力热力图">
+  <section class="experiment" id="library" data-title="图书馆借书三步走">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">1</span>参数控制台</div>
-        <div class="small muted">输入序列：</div>
-        <div id="h-data" style="margin:6px 0 4px"></div>
-        <div id="h-dk"></div>
-        <div id="h-scale"></div>
-        <div id="h-mask"></div>
-        <div id="h-coref"></div>
-        <div class="btn-row"><button class="btn ghost" id="h-reseed">重新随机 $\mathbf Q,\mathbf K,\mathbf V$</button></div>
-        <div class="caption">点击热力图的某一行，下方会展开这个词的注意力分配；鼠标悬停（或手指轻触）查看单元格的得分。</div>
+        <p class="small">特征空间只有两个维度：第 1 个数是“科技含量”，第 2 个数是“美食含量”。书架上 3 本书的封皮标签 $\mathbf k_i$ 和书中内容 $\mathbf v_i$ 与书中 5.1 节完全相同。</p>
+        <div id="l-q1"></div>
+        <div id="l-q2"></div>
+        <div class="small muted">怎么把打分变成百分比：</div>
+        <div id="l-mode" style="margin:6px 0 4px"></div>
+        <div id="l-round"></div>
+        <div class="btn-row">
+          <button class="btn ghost" id="l-book">书中算例 $\mathbf q=(1,0)$</button>
+          <button class="btn ghost" id="l-neg">来一个负分 $\mathbf q=(-1,2)$</button>
+        </div>
       </div>
       <div class="stack">
-        <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c1)">A</span>注意力权重 $\mathbf A=\operatorname{Softmax}\!\big((\mathbf Q\mathbf K^\top+\mathbf M)/\sqrt{d_k}\big)$<span class="sub">行 = 查询词 · 列 = 键词</span></div>
-          <div class="viz h420" id="h-heat"></div>
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c1)">①</span>内积打分 $s_i=\mathbf q\cdot\mathbf k_i$</div>
+            <div class="viz h260" id="l-score"></div>
+            <div class="caption">第 1 本“数码科技” $\mathbf k_1=(1,0)$；第 2 本“生鲜水果” $\mathbf k_2=(0,1)$；第 3 本“数码与水果跨界” $\mathbf k_3=(1,1)$。</div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c2)">②</span>注意力百分比 $\alpha_i$</div>
+            <div class="viz h260" id="l-weight"></div>
+            <div class="caption" id="l-warn"></div>
+          </div>
         </div>
-        <div class="stats" id="h-stats"></div>
+        <div class="stats" id="l-stats"></div>
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c2)">→</span><span id="h-rowtitle">第 t 个词把注意力分给了谁</span></div>
-          <div class="viz h260" id="h-row"></div>
-          <div class="caption">柱高为注意力权重 $a_{tj}$；词下方的小字是送进 Softmax 的得分（灰色表示被掩码遮住的未来位置）。</div>
-        </div>
-        <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c3)">✍</span>书中手算算例：“小猫 / 抓 / 老鼠”，$d_k=d_v=4$<span class="sub">随左侧开关实时重算</span></div>
-          <div id="h-book" style="overflow-x:auto"></div>
+          <div class="card-title"><span class="dot" style="background:var(--c3)">③</span>按百分比把书中内容抄到笔记本上<span class="sub">随左侧滑块实时重算</span></div>
+          <div id="l-steps" style="overflow-x:auto"></div>
         </div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
-          <div class="formula">$$\operatorname{Attention}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \operatorname{Softmax}\!\left(\frac{\mathbf{Q}\mathbf{K}^\top + \mathbf{M}}{\sqrt{d_k}}\right)\mathbf{V}$$</div>
-          <div class="explain">一行公式干完五件事：$\mathbf Q\mathbf K^\top$ 全员相亲打分；$+\mathbf M$ 拉上防剧透窗帘（未来位置填 $-\infty$）；除以 $\sqrt{d_k}$ 给方差降温；逐行 Softmax 变成百分比；最后乘 $\mathbf V$ 按权重提货。</div>
+          <div class="formula">$$s_i=\mathbf q\cdot\mathbf k_i,\qquad \alpha_i=\frac{e^{s_i}}{\sum_{r=1}^{3}e^{s_r}},\qquad \mathbf o=\sum_{i=1}^{3}\alpha_i\mathbf v_i$$</div>
+          <div class="explain">三步走：拿查询单 $\mathbf q$ 跟每本书的封皮标签 $\mathbf k_i$ 算匹配分数；用指数 $e^{s}$ 把任何分数都变成正数，再除以总和变成加起来等于 $1$ 的百分比；最后按百分比把每本书里的干货 $\mathbf v_i$ 抄到一起。</div>
         </div>
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>选“书中 3 词元算例”：第 2 行恰好是 $(0.018,\ 0.982,\ 0)$，第 3 行三个得分都是 2，均分为 $\tfrac13$。</li>
-            <li>关掉因果掩码：第 1 行“小猫”不再只能看自己，它会把 $86.7\%$ 的注意力给“老鼠”。</li>
-            <li>切到句子，点“它”这一行：打开“对齐”开关后，“它”把大部分注意力投给“小猫”；关掉后就只剩随机噪声。</li>
-            <li>关掉 $\sqrt{d_k}$ 缩放并把 $d_k$ 拉到 256：热力图几乎每行只剩一个格子是深色，Softmax 饱和了。</li>
+            <li>点“书中算例”：打分是 $(1,0,1)$，百分比约 $(0.42,0.16,0.42)$，笔记 $\mathbf o\approx(16.89,\ 40.88)$。勾选“按书中手算”后变成书里的 $(16.8,\ 41.2)$，差别只来自四舍五入。</li>
+            <li>把美食分量 $q_2$ 拉到 $2$：第 2、3 本书的分数一起上涨，“好评度”这一栏被抄得越来越多。</li>
+            <li>点“来一个负分”，再切到“直接除以总分”：打分是 $(-1,2,1)$，第 1 本书出现 $-50\%$ 的负百分比；再把 $q_1$ 拖到 $-2$，总分正好是 $0$，除法当场崩溃。切回 Softmax，一切又恢复正常。</li>
+            <li>把 $q_1$ 拉到 $3$：两本科技书的百分比都逼近 $50\%$，生鲜水果那本几乎被忽略。</li>
           </ol>
         </div>
       </div>
@@ -62,7 +67,7 @@
   </section>
 
   <!-- ========================= 实验 2 ========================= -->
-  <section class="experiment" id="sqrt-dk" data-title="√dₖ 之谜">
+  <section class="experiment" id="sqrt-dk" data-title="√dₖ 救活导数">
     <div class="lab-grid">
       <div class="card controls">
         <div class="card-title"><span class="dot">2</span>参数控制台</div>
@@ -87,6 +92,10 @@
           </div>
         </div>
         <div class="stats" id="s-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c4)">✍</span>书中算例：两个候选词，第 1 个碰上了 $+2$ 个标准差的打分<span class="sub" id="s-two-sub"></span></div>
+          <div id="s-two" style="overflow-x:auto"></div>
+        </div>
         <div class="row2">
           <div class="card">
             <div class="card-title"><span class="dot" style="background:var(--coral)">J</span>梯度范数 $\|\mathbf J_{\operatorname{Softmax}}\|_F$ 随 $d_k$ 的变化</div>
@@ -108,10 +117,10 @@
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
-            <li>关掉缩放，把 $d_k$ 从 4 拉到 512：得分直方图越摊越宽，红色梯度曲线一路跌向 0（这正是书中图 5.1 右图）。</li>
-            <li>打开缩放：无论 $d_k$ 多大，得分标准差都稳定在 1，绿色曲线是一条水平线。</li>
-            <li>保持缩放，把温度 $\tau$ 调到 $0.2$：即使除了 $\sqrt{d_k}$，过低的温度也会把 Softmax 推进饱和区。</li>
-            <li>把 $T$ 调大：均匀分布时 $\|\mathbf J\|_F\approx 1/\sqrt T$，词越多，单个注意力头分到的梯度越少。</li>
+            <li>默认 $d_k=100$、不缩放：得分标准差约 $10$，书中的 $+20$ 分正是 $2$ 个标准差。看上方“书中算例”卡片：导数 $p_1(1-p_1)\approx2.1\times10^{-9}$。</li>
+            <li>勾选“除以 $\sqrt{d_k}$”：同一个打分变成 $2$，$p_1\approx0.88$，导数约 $0.105$，大了约五千万倍。</li>
+            <li>关掉缩放，把 $d_k$ 从 4 拉到 1024：得分直方图越摊越宽，红色梯度曲线一路跌向 0；打开缩放，绿色曲线是一条水平线。</li>
+            <li>保持缩放，把温度 $\tau$ 调到 $0.2$：即使除了 $\sqrt{d_k}$，过低的温度也会把 Softmax 推进饱和区（第 1 章的温度采样也是这个道理）。</li>
           </ol>
         </div>
       </div>
@@ -119,10 +128,59 @@
   </section>
 
   <!-- ========================= 实验 3 ========================= -->
-  <section class="experiment" id="kv-cache" data-title="KV Cache 计算器">
+  <section class="experiment" id="mask-kv" data-title="因果掩码与 KV 缓存">
+    <div class="lab-grid" id="heatmap">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">3</span>因果掩码控制台</div>
+        <div class="small muted">输入序列：</div>
+        <div id="h-data" style="margin:6px 0 4px"></div>
+        <div id="h-dk"></div>
+        <div id="h-scale"></div>
+        <div id="h-mask"></div>
+        <div class="small muted" id="h-fill-label">未来位置的打分填什么：</div>
+        <div id="h-fill" style="margin:6px 0 4px"></div>
+        <div id="h-coref"></div>
+        <div class="btn-row"><button class="btn ghost" id="h-reseed">重新随机 $\mathbf Q,\mathbf K,\mathbf V$</button></div>
+        <div class="caption">点击热力图的某一行，下方会展开这个词的注意力分配；鼠标悬停（或手指轻触）查看单元格的得分。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">A</span>注意力权重 $\mathbf A=\operatorname{Softmax}\!\big((\mathbf Q\mathbf K^\top+\mathbf M)/\sqrt{d_k}\big)$<span class="sub">行 = 查询词 · 列 = 键词</span></div>
+          <div class="viz h420" id="h-heat"></div>
+        </div>
+        <div class="stats" id="h-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c2)">→</span><span id="h-rowtitle">第 t 个词把注意力分给了谁</span></div>
+          <div class="viz h260" id="h-row"></div>
+          <div class="caption">柱高为注意力权重 $a_{tj}$；词下方的小字是送进 Softmax 的得分（灰色表示被掩码遮住的未来位置）。</div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c3)">✍</span>书中手算算例：“我 / 喝 / 水”，$d_k=4$，$d_v=2$<span class="sub">随左侧开关实时重算</span></div>
+          <div id="h-book" style="overflow-x:auto"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\operatorname{Attention}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \operatorname{Softmax}\!\left(\frac{\mathbf{Q}\mathbf{K}^\top + \mathbf{M}}{\sqrt{d_k}}\right)\mathbf{V}$$</div>
+          <div class="explain">一行公式干完五件事：$\mathbf Q\mathbf K^\top$ 全员相亲打分；$+\mathbf M$ 拉上防剧透窗帘（未来位置填 $-\infty$）；除以 $\sqrt{d_k}$ 给方差降温；逐行 Softmax 变成百分比；最后乘 $\mathbf V$ 按权重提货。</div>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>选“书中算例”：第 2 行恰好是 $(0.5,\ 0.5,\ 0)$，第 3 行约 $(0.06,\ 0.47,\ 0.47)$；输出第 3 行 $\mathbf o_3\approx(14.7,\ 23.4)$，书中用两位小数的权重算得 $23.5$。</li>
+            <li>把“未来位置”改成填 $0$：第 1 行“我”不再只看自己，$e^0=1$ 让它把约 $21\%$ 的注意力漏给了后面的“喝”和“水”。</li>
+            <li>关掉因果掩码：每个词都能偷看整句话，第 1 行变成 $(0.79,\ 0.11,\ 0.11)$。</li>
+            <li>切到句子，点“它”这一行：打开“对齐”开关后，“它”把大部分注意力投给“苹果”；关掉后就只剩随机噪声。</li>
+            <li>关掉 $\sqrt{d_k}$ 缩放并把 $d_k$ 拉到 256：热力图几乎每行只剩一个格子是深色，Softmax 饱和了。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:22px"></div>
+
     <div class="lab-grid">
       <div class="card controls">
-        <div class="card-title"><span class="dot">3</span>模型与推理设置</div>
+        <div class="card-title"><span class="dot">KV</span>KV 缓存：模型与推理设置</div>
         <div class="control"><div class="control-head"><span>预设模型</span></div><select id="kv-preset"></select></div>
         <div id="kv-L"></div>
         <div id="kv-H"></div>
@@ -137,6 +195,12 @@
         <div id="kv-bytes" style="margin:6px 0 4px"></div>
       </div>
       <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c2)">✍</span>练习 5.3：生成第 $t$ 个词时，算标签矩阵 $\mathbf K$ 要做多少次乘法</div>
+          <div class="row2"><div id="x-d"></div><div id="x-t"></div></div>
+          <div class="stats" id="x-stats"></div>
+          <div class="caption">不用缓存：把 $t$ 个词的 $\mathbf K=\mathbf X\mathbf W_K$ 从头算一遍，共 $t\times d\times d$ 次；用缓存：只算新词的一行 $\mathbf k_t=\mathbf x_t\mathbf W_K$，共 $d\times d$ 次。</div>
+        </div>
         <div class="card">
           <div class="card-title"><span class="dot" style="background:var(--c1)">KV</span>每个词元、每一层要缓存多少个数<span class="sub" id="kv-sub"></span></div>
           <div class="viz h260" id="kv-bars"></div>
@@ -160,10 +224,10 @@
         <div class="try">
           <h3>🧪 试一试</h3>
           <ol>
+            <li>上方练习卡片默认 $d=100$、$t=100$：不用缓存要 $1{,}000{,}000$ 次乘法，用缓存只要 $10{,}000$ 次，省掉 $99\%$。把 $t$ 拉大，省下的比例越来越接近 $100\%$。</li>
             <li>选 LLaMA-2-7B，把上下文拉到 128K：仅 KV Cache 就要 64 GB，单张 80 GB 显卡几乎放不下第二个请求。</li>
-            <li>切到 LLaMA-3-8B（8 组 GQA）：同样长度只要 MHA 的 25%，这就是表中“12.5%～25%”的来历。</li>
-            <li>保持 $H=32,\ d_k=128$，看 MQA 一栏：只剩 $2d_k/2Hd_k=1/32\approx3.1\%$。</li>
-            <li>选 DeepSeek-V3：128 个头本来要缓存 $2\times128\times128=32768$ 个数，MLA 只存 $512+64=576$ 个。</li>
+            <li>切到 LLaMA-3-8B：$32$ 个查询头每 $4$ 个共用一套 $\mathbf K,\mathbf V$（只存 $8$ 套），显存只剩 MHA 的 $25\%$，也就是书中说的“省掉 $75\%$”。</li>
+            <li>选 DeepSeek-V3：128 个头本来要缓存 $2\times128\times128=32768$ 个数，MLA 只存 $512+64=576$ 个，省掉 $98\%$ 以上。</li>
           </ol>
         </div>
       </div>
