@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 10 章 · 在线实验室</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="assets/lab.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="assets/lab.js"></script>
+<script defer src="ch10.js"></script>
+</head>
+<body data-chapter="10">
+<main class="container">
+
+  <!-- ========================= 实验 1 ========================= -->
+  <section class="experiment" id="chinchilla" data-title="Chinchilla 计算器">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">1</span>给定算力，怎么分？</div>
+        <div class="control"><div class="control-head"><span>幂律常数</span></div><div id="c-preset"></div></div>
+        <div id="c-C"></div>
+        <div class="btn-row" style="margin-top:0"><button class="btn amber" id="c-book">书中算例：$C=6\times10^{21}$</button></div>
+        <div id="c-alpha"></div>
+        <div id="c-beta"></div>
+        <div class="caption">在损失地图上点按或拖动，可沿等算力线挑一个 $(N,D)$ 组合，看它比最优点差多少。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">L</span>损失地图与等算力线 $6ND=C$</div>
+          <div class="viz h380" id="c-map" style="touch-action:none; cursor:crosshair"></div>
+          <div class="legend"><span><i style="background:var(--coral)"></i>等算力线</span><span><i style="background:var(--navy);height:8px;width:8px;border-radius:50%"></i>解析最优点</span><span><i style="background:var(--amber);height:8px;width:8px;border-radius:50%"></i>经验法则 $D=20N$</span><span><i style="background:var(--plum);height:2px"></i>不同算力下的最优点轨迹</span><span><i style="background:var(--slate);height:2px"></i>$D=20N$</span></div>
+        </div>
+        <div class="stats" id="c-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c4)">∪</span>沿等算力线的损失剖面与分配对照</div>
+          <div class="viz h260" id="c-profile"></div>
+          <div style="overflow-x:auto; margin-top:10px"><table class="data" id="c-table"></table></div>
+          <p class="small muted" id="c-note" style="margin-bottom:0"></p>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$L(N, D) = E + \frac{A}{N^\alpha} + \frac{B}{D^\beta},\qquad C\approx 6ND$$</div>
+          <div class="formula">$$\alpha A N^{-\alpha} = \beta B D^{-\beta}\;\Longrightarrow\; N_{\text{opt}}=\Big(\frac{\alpha A}{\beta B}\Big)^{\frac{1}{\alpha+\beta}}\Big(\frac{C}{6}\Big)^{\frac{\beta}{\alpha+\beta}},\qquad D_{\text{opt}}=\frac{C}{6N_{\text{opt}}}$$</div>
+          <p class="small muted" style="margin-bottom:0">最优点上，模型容量不足的边际损失恰好等于数据不足的边际损失。算力翻 10 倍，$N_{\text{opt}}$ 翻 $10^{\beta/(\alpha+\beta)}$ 倍，$D_{\text{opt}}$ 翻 $10^{\alpha/(\alpha+\beta)}$ 倍。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>点“书中算例”并切到“书中手算常数”：经验法则 $D=20N$ 给出 $N\approx7.07\text{B}$、$D\approx141.4\text{B}$；而 $\alpha=\beta,\ A=B$ 时解析最优恰好是 $N=D$。</li>
+            <li>切回 Chinchilla 拟合常数：解析最优的 $D/N$ 并不是 20。但看损失剖面，谷底非常平，按 20 倍分配只多付千分之几的损失。</li>
+            <li>把算力从 $10^{20}$ 拖到 $10^{25}$：最优点沿紫色轨迹移动，每 10 倍算力 $N$ 与 $D$ 各涨约 $3$ 倍。</li>
+            <li>在地图上点 GPT-3 式的分配（大 $N$、小 $D$）：同样的算力，损失明显更高，这就是“营养不良”。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 2 ========================= -->
+  <section class="experiment" id="emergence" data-title="平滑的损失与陡峭的涌现">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">2</span>K 步全对才得分</div>
+        <div id="e-K"></div>
+        <div id="e-eps"></div>
+        <div id="e-alpha"></div>
+        <div id="e-ntest"></div>
+        <div id="e-log"></div>
+        <div class="btn-row"><button class="btn ghost" id="e-resample">重新抽一次测试集</button></div>
+        <div class="caption">在任务准确率图上点按可以选一个模型规模 $N$。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">ℓ</span>单步损失随规模平滑下降<span class="sub">双对数坐标</span></div>
+          <div class="viz h260" id="e-loss"></div>
+          <div class="legend"><span><i style="background:var(--c1)"></i>单步损失 $\ell(N)=\varepsilon+AN^{-\alpha}$</span><span><i style="background:var(--c3)"></i>单步正确率 $p=e^{-\ell}$（右轴）</span></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c4)">K</span>任务准确率 $p^K$：“涌现”出现了</div>
+          <div class="viz h300" id="e-acc" style="touch-action:none; cursor:crosshair"></div>
+          <div class="legend"><span><i style="background:var(--c4)"></i>全对才得分 $p^K$</span><span><i style="background:var(--c3)"></i>平滑指标：逐步正确率 $p$</span><span><i style="background:#cfd6de"></i>其他 $K$</span><span><i style="background:var(--navy);height:8px;width:8px;border-radius:50%"></i>有限测试集上的实测值</span></div>
+        </div>
+        <div class="stats" id="e-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$p_{\text{token}}(N) = \exp\!\big(-\ell(N)\big),\qquad \operatorname{Acc}_{\text{task}}(N, K) = \big[p_{\text{token}}(N)\big]^K = \exp\!\big(-K \cdot \ell(N)\big)$$</div>
+          <p class="small muted">书中写作 $p=\exp(-E-AN^{-\alpha})$；这里把不可约项换成任务自身的小误差 $\varepsilon$（否则 $e^{-1.69}\approx0.18$，单步正确率太低）。$A=406.4$ 取自 Chinchilla 拟合。临界规模 $N_{\text{crit}}\approx(KA)^{1/\alpha}$ 处 $K\ell\approx1$，准确率约 $e^{-1}$。</p>
+          <div style="overflow-x:auto"><table class="data" id="e-table"></table></div>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>把 $K$ 从 1 拉到 50：单步损失曲线一点没变，任务准确率却从缓坡变成悬崖，临界规模往右移。</li>
+            <li>勾选“纵轴取对数”：$\ln\operatorname{Acc}=-K\ell(N)$ 又变回平滑曲线，涌现的“突变”来自指标，而不是模型。</li>
+            <li>把测试集调到 100 题：小模型的实测准确率全是 0，看起来像“完全不会”，其实只是分辨率不够。</li>
+            <li>对照表复现书中数字：$K=50$ 时 $0.85^{50}\approx0.03\%$、$0.99^{50}\approx60.5\%$。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 3 ========================= -->
+  <section class="experiment" id="double-descent" data-title="双下降">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">3</span>随机特征岭回归</div>
+        <div id="dd-p"></div>
+        <div id="dd-lam"></div>
+        <div id="dd-n"></div>
+        <div id="dd-sigma"></div>
+        <div class="btn-row"><button class="btn ghost" id="dd-resample">换一组训练数据</button></div>
+        <div class="caption">特征 $\phi_j(x)=a_j\sqrt2\cos(w_jx+b_j)$：20% 低频（$w\sim\mathcal N(0,4^2)$，$a=1$），80% 高频小振幅（$w\sim\mathcal N(0,150^2)$，$a=\sqrt{0.1}$），$b\sim U[0,2\pi]$。曲线是 5 组随机特征的平均。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c4)">∿</span>测试误差随特征数 $p$ 的变化<span class="sub">对数纵轴</span></div>
+          <div class="viz h300" id="dd-curve" style="touch-action:none; cursor:crosshair"></div>
+          <div class="legend"><span><i style="background:var(--c4)"></i>测试误差</span><span><i style="background:var(--c1)"></i>训练误差</span><span><i style="background:var(--slate);height:2px"></i>插值阈值 $p=n$</span></div>
+        </div>
+        <div class="stats" id="dd-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">f</span>当前 $p$ 下的拟合曲线</div>
+          <div class="viz h260" id="dd-fit"></div>
+          <div class="legend"><span><i style="background:var(--slate);height:2px"></i>真实函数 $f(x)$</span><span><i style="background:var(--c1)"></i>拟合 $\hat f(x)$</span><span><i style="background:var(--amber);height:8px;width:8px;border-radius:50%"></i>训练点（含噪声）</span></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\hat{\boldsymbol\theta}=\arg\min_{\boldsymbol\theta}\ \|\boldsymbol\Phi\boldsymbol\theta-\mathbf y\|^2+\lambda\|\boldsymbol\theta\|^2=\boldsymbol\Phi^\top(\boldsymbol\Phi\boldsymbol\Phi^\top+\lambda\mathbf I)^{-1}\mathbf y\ \xrightarrow{\lambda\to0^+}\ \text{最小范数插值解}$$</div>
+          <p class="small muted" style="margin-bottom:0">$p&lt;n$ 时增加特征先降低偏差；$p$ 逼近 $n$ 时方程刚好能被解出，$\boldsymbol\Phi\boldsymbol\Phi^\top$ 的最小特征值趋近 0，系数被迫变得巨大去“穿过”每个噪声点，测试误差冲上尖峰；$p\gg n$ 后满足插值的解有无穷多个，最小范数解会挑最“省力”的那个，用高频特征在训练点附近吸收噪声，主体曲线反而重新变平滑。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>默认 $p=8n$：训练误差已经是 0，噪声被高频小振幅特征就地吸收成细碎的抖动，主体曲线贴着真实函数，测试误差比经典区的最佳点（约 $p\approx0.4n$）还低。</li>
+            <li>把 $p$ 拖到 $n$ 附近：曲线为了穿过每个噪声点剧烈振荡，系数范数 $\|\hat{\boldsymbol\theta}\|$ 暴涨，测试误差冲上尖峰。</li>
+            <li>把 $\lambda$ 从 $10^{-9}$ 加到 $10^{-2}$：尖峰被削平，代价是训练误差不再为 0。</li>
+            <li>把噪声 $\sigma$ 调成 0：尖峰大幅降低。尖峰主要来自“硬穿过噪声”。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

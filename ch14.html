@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 14 章 · 在线实验室</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="assets/lab.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="assets/lab.js"></script>
+<script defer src="ch14.js"></script>
+<style>.fno-chip { display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:999px; border:1px solid var(--line); background:#fff; font-size:13px; white-space:nowrap; } .fno-chip.on { background:var(--c6l); border-color:var(--teal); color:var(--teal); } .fno-arrow { color:var(--slate); margin:0 2px; }</style>
+</head>
+<body data-chapter="14">
+<main class="container">
+
+  <!-- ========================= 实验 1 ========================= -->
+  <section class="experiment" id="heat" data-title="热方程的频域一步解">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">1</span>初始温度与扩散</div>
+        <div class="explain small">周期区间 $[0,2\pi]$ 上的热方程 $\dfrac{\partial u}{\partial t}=\kappa\dfrac{\partial^2 u}{\partial x^2}$，初始温度 $a(x)=u(x,0)$。</div>
+        <div class="small muted">初始温度 $a(x)$：</div>
+        <div id="h-preset" style="margin:6px 0 4px"></div>
+        <div class="caption" style="margin-top:2px">也可以在右侧频谱图上拖动柱子，直接改写各个模态的初始振幅。</div>
+        <div id="h-kappa"></div>
+        <div id="h-t"></div>
+        <div class="btn-row">
+          <button class="btn teal" id="h-play">▶ 播放 $t: 0\to3$</button>
+        </div>
+        <div class="caption">在上图中点击或拖动，可以选择查询点 $y=(x,t)$，下方表格按 DeepONet 的“分支 × 主干”拆开计算 $u(x,t)$。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c4)">u</span>物理空间：温度曲线<span class="sub">青点 = 有限差分逐步求解</span></div>
+          <div class="viz h300" id="h-phys"></div>
+          <div class="legend">
+            <span><i style="background:var(--slate);opacity:.5"></i>$u(x,0)=a(x)$</span>
+            <span><i style="background:var(--c4)"></i>$u(x,t)$ 频域精确解</span>
+            <span><i style="background:var(--c6)"></i>有限差分（64 个网格点）</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">k</span>频域：每个模态乘上 $e^{-\kappa k^2 t}$<span class="sub">空心 = 初始　实心 = $t$ 时刻</span></div>
+          <div class="viz h260" id="h-spec"></div>
+          <div class="legend">
+            <span><i style="background:var(--c1)"></i>$\cos kx$ 系数</span>
+            <span><i style="background:var(--c2)"></i>$\sin kx$ 系数</span>
+            <span>上方数字：乘子 $e^{-\kappa k^2 t}$</span>
+          </div>
+        </div>
+        <div class="stats" id="h-stats"></div>
+        <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>三步频域解</div>
+            <div class="formula" id="h-formula"></div>
+            <p class="small muted">二阶导数在频域就是乘以 $-k^2$，所以每个模态独立地按 $e^{-\kappa k^2 t}$ 衰减。书中取 $\kappa=0.1$、$t=1$：$e^{-0.1}\approx0.905$，$e^{-0.9}\approx0.407$，高频起伏被迅速抹平。</p>
+        </div>
+        <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--teal)">⟨⟩</span>DeepONet 视角：分支 · 主干</div>
+            <div id="h-deeponet" class="small"></div>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>保持书中算例和 $\kappa=0.1$、$t=1$：读出两个乘子 0.905、0.407，以及 $u(x,1)\approx2.715\cos x+0.813\cos 3x$。</li>
+            <li>点“播放”：$\cos 3x$ 的小波纹先消失，只剩平缓的 $\cos x$。衰减速度和 $k^2$ 成正比。</li>
+            <li>选“方波”：棱角（高频）几乎瞬间被磨圆。再把 $\kappa$ 调到 0.5、$t$ 调到 3：右侧有限差分要走多少步？频域只需 1 次乘法。</li>
+            <li>在曲线上换几个查询点：主干网 $t_k(y)$ 只依赖坐标，分支网 $b_k(a)$ 只依赖初始函数，两者内积就是答案。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 2 ========================= -->
+  <section class="experiment" id="fno" data-title="FNO 的频谱截断">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">2</span>输入函数 $v(x)$</div>
+        <div id="n-preset" style="margin:4px 0 4px"></div>
+        <div class="caption" style="margin-top:2px">直接在上图里按住拖动，可以手绘任意输入函数。</div>
+        <div class="small muted" style="margin-top:10px">网格点数 $N$：</div>
+        <div id="n-grid" style="margin:6px 0 4px"></div>
+        <div id="n-k"></div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <div class="small muted">FNO 层的谱权重 $\mathbf R_k$：</div>
+        <div id="n-r" style="margin:6px 0 4px"></div>
+        <div id="n-w"></div>
+        <div id="n-act"></div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">v</span>只保留最低的 $k_{\max}$ 个频率<span class="sub">可在图中手绘</span></div>
+          <div class="viz h300" id="n-recon"></div>
+          <div class="legend">
+            <span><i style="background:var(--slate);opacity:.5"></i>输入 $v(x)$ 的 $N$ 个采样点</span>
+            <span><i style="background:var(--c1)"></i>截断重构 $\mathcal F^{-1}(\mathbf 1_{|k|\le k_{\max}}\cdot\mathcal F v)$</span>
+            <span><i style="background:var(--c4)"></i>误差</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--navy)">ĉ</span>频谱 $|(\mathcal F v)_k|$</div>
+          <div class="viz h260" id="n-spec"></div>
+        </div>
+        <div class="stats" id="n-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--teal)">F</span>一层 FNO 的流水线</div>
+          <div id="n-pipe" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 2px;margin-bottom:10px"></div>
+          <div class="viz h260" id="n-layer"></div>
+          <div class="legend">
+            <span><i style="background:var(--c6)"></i>频域支路 $\mathcal F^{-1}(\mathbf R\cdot\mathcal F v)$</span>
+            <span><i style="background:var(--c2)"></i>局部支路 $W v(x)$</span>
+            <span><i style="background:var(--navy)"></i>输出 $v_{l+1}(x)$</span>
+          </div>
+          <div class="caption" id="n-res-cap"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$v_{l+1}(x) = \sigma\Big( W_l v_l(x) + \mathcal{F}^{-1}\big( \mathbf{R}_l \cdot (\mathcal{F} v_l) \big)(x) \Big)$$</div>
+          <p class="small muted">$\mathbf R_l$ 只定义在 $k=0,\dots,k_{\max}$ 这几个频率上，高于 $k_{\max}$ 的模态直接置零。所以参数量与网格点数 $N$ 无关，同一组权重可以直接用在 32 点或 1024 点的网格上（分辨率无关性）。截断丢掉的高频由局部支路 $W v$ 补一部分细节。本实验为单通道示意，$\mathbf R_k$ 取三种有明确含义的算子：恒等（纯低通）、热核 $e^{-\kappa k^2 t}$（$\kappa t=0.05$）与求导 $ik$。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>选“方波”，把 $k_{\max}$ 从 1 慢慢加大：跳变处始终有约 9% 的过冲（吉布斯现象），截断误差下降得很慢。</li>
+            <li>选“毛刺正弦”：毛刺来自 18 到 30 的高频，$k_{\max}=10$ 就把它们全部滤掉，只剩光滑主体。</li>
+            <li>选“毛刺正弦”，把 $\mathbf R_k$ 设为“求导”，在 64、128、256 之间切换 $N$：与 1024 点细网格的输出只差 $10^{-14}$ 量级，同一组权重在任何分辨率上给出同一个答案。</li>
+            <li>再切到 $N=32$：毛刺的频率 18 到 30 超过了 $N/2=16$，被混叠到低频，粗细网格的输出相差很大。方波的频谱拖得很长，也会留下小幅差距。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 3 ========================= -->
+  <section class="experiment" id="pinn" data-title="PINN 残差与激活函数">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">3</span>不给答案，只给方程</div>
+        <div class="explain small">在 $x\in[0,\pi]$、$t\in[0,1]$ 上求解 $u_t=\kappa u_{xx}$，初值 $u(x,0)=\sin x$，边界 $u(0,t)=u(\pi,t)=0$。真解为 $e^{-\kappa t}\sin x$，但训练时不使用它。</div>
+        <div id="p-mode" style="margin:8px 0 4px"></div>
+        <div id="p-manual"></div>
+        <div id="p-net">
+          <div class="small muted" style="margin-top:6px">激活函数：</div>
+          <div id="p-act" style="margin:6px 0 4px"></div>
+          <div class="btn-row">
+            <button class="btn teal" id="p-train">▶ 训练</button>
+            <button class="btn ghost" id="p-reset">重新初始化</button>
+          </div>
+          <div class="caption">单隐层 24 个神经元，Adam 优化，200 个配点。导数 $u_t$、$u_{xx}$ 按链式法则解析求出，作用等同于自动微分。</div>
+        </div>
+        <div id="p-kappa"></div>
+      </div>
+      <div class="stack">
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c4)">r</span>物理残差 $r=\hat u_t-\kappa\hat u_{xx}$</div>
+            <div class="viz h260" id="p-res"></div>
+            <div class="caption">横轴 $x$，纵轴 $t$。红正蓝负，越白越接近 0；黑点是配点。</div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c1)">û</span>候选解与真解的切片</div>
+            <div class="viz h260" id="p-slice"></div>
+            <div class="legend">
+              <span><i style="background:var(--c1)"></i>$t=0$</span>
+              <span><i style="background:var(--c6)"></i>$t=0.5$</span>
+              <span><i style="background:var(--c5)"></i>$t=1$</span>
+              <span>虚线 = 真解</span>
+            </div>
+          </div>
+        </div>
+        <div class="stats" id="p-stats"></div>
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--navy)">L</span><span id="p-loss-title">损失曲线</span></div>
+            <div class="viz h260" id="p-loss"></div>
+            <div class="legend" id="p-loss-legend"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--amber)">σ″</span>激活函数及其导数</div>
+            <div class="viz h260" id="p-actplot"></div>
+            <div class="legend">
+              <span><i style="background:var(--navy)"></i>$\sigma(z)$</span>
+              <span><i style="background:var(--c2)"></i>$\sigma'(z)$</span>
+              <span><i style="background:var(--c4)"></i>$\sigma''(z)$</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\mathcal{L}_{\text{PINN}} = \underbrace{\frac{1}{N_c}\sum_{j=1}^{N_c} \big(\hat u_t - \kappa\,\hat u_{xx}\big)^2\Big|_{(x_j,t_j)}}_{\text{物理残差，无需标签}} + \underbrace{\frac{1}{N_0}\sum_i\big(\hat u(x_i,0)-\sin x_i\big)^2+\frac{1}{N_b}\sum_i \hat u(\text{边界})^2}_{\text{初值与边界}}$$</div>
+          <div class="formula">$$\begin{gathered}\hat u(x,t)=c_0+\sum_{j}c_j\,\sigma(a_jx+b_jt+d_j)\\ \hat u_t=\sum_j c_jb_j\,\sigma'(\cdot),\qquad \hat u_{xx}=\sum_j c_ja_j^2\,\sigma''(\cdot)\end{gathered}$$</div>
+          <p class="small muted">$\operatorname{ReLU}''(z)\equiv0$（原点除外），于是网络算出的 $\hat u_{xx}$ 恒为 0，残差退化成 $\hat u_t$。“不随时间变化的 $\sin x$”恰好让这个残差、初值和边界误差同时为 0，所以 ReLU 网络会心安理得地收敛到一个错误的静态解：损失很小，答案却错了。$\tanh$、SiLU 这类光滑激活函数的二阶导数不为 0，残差才真正约束了扩散。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>“手调候选解”模式下，固定 $A=1$、$\omega=1$，拖动 $\lambda$：残差图在 $\lambda=\kappa\omega^2$ 时整片变白，这就是物理约束。</li>
+            <li>把 $\omega$ 调到 2：残差仍可以通过 $\lambda=4\kappa$ 归零，但初值误差变大。三项损失缺一不可。</li>
+            <li>切到“训练小网络”，用 $\tanh$ 训练：相对误差降到千分之几，$t=1$ 的切片贴合真解。</li>
+            <li>换成 ReLU 再训练：物理损失同样降到很小，但 $t=1$ 的曲线根本没有衰减。看右下角 $\sigma''$ 那条红线。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

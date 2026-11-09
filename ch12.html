@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 12 章 · 在线实验室</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="assets/lab.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="assets/lab.js"></script>
+<script defer src="ch12.js"></script>
+</head>
+<body data-chapter="12">
+<main class="container">
+
+  <!-- ========================= 实验 1 ========================= -->
+  <section class="experiment" id="sampling" data-title="温度、Top-k 与 Top-p">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">1</span>解码旋钮</div>
+        <div class="small muted">选一个语境：</div>
+        <div id="ctx-seg" style="margin:6px 0 2px"></div>
+        <div class="explain kai" id="ctx-text"></div>
+        <div id="tau-s"></div>
+        <div id="k-s"></div>
+        <div id="p-s"></div>
+        <div class="btn-row">
+          <button class="btn" id="btn-sample">采样 20 次</button>
+          <button class="btn ghost" id="btn-greedy">贪心（$\tau\to0$）</button>
+          <button class="btn ghost" id="btn-reset1">恢复默认</button>
+        </div>
+        <div class="caption">处理顺序：先做 $\operatorname{Softmax}(z/\tau)$，再按 Top-k、Top-p 截断，最后在保留的词上重新归一化。Top-k 取 12、Top-p 取 1 表示不截断。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c2)">P</span>按概率排序的候选词<span class="sub">彩色 = 保留　灰色 = 截掉</span></div>
+          <div class="viz h340" id="dec-bars"></div>
+          <div class="legend">
+            <span><i style="background:var(--c2l);border:1px solid var(--c2)"></i>截断前 $P_i(\tau)$</span>
+            <span><i style="background:var(--c2)"></i>重新归一化后的采样概率</span>
+            <span><i style="background:var(--navy)"></i>采样 20 次的频率</span>
+          </div>
+          <div class="caption">下方横条把排好序的概率首尾相接：Top-p 从左往右“圈人”，累积到 $p$ 立刻关门。</div>
+        </div>
+        <div class="stats" id="stats-dec"></div>
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--navy)">20</span>抽签结果</div>
+            <div id="sample-chips" class="pill-row"></div>
+            <div class="caption" id="sample-cap">点左侧“采样 20 次”。</div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c5)">✎</span>玩具语言模型续写</div>
+            <div id="gen-text" style="font-size:15.5px; line-height:1.9; min-height:5.7em; word-break:break-all"></div>
+            <div class="btn-row" style="margin-top:6px">
+              <button class="btn teal" id="btn-gen">用当前旋钮生成</button>
+            </div>
+            <div class="caption" id="gen-cap"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$P_i(\tau) = \frac{\exp(z_i / \tau)}{\sum_{j=1}^{|\mathcal{V}|} \exp(z_j / \tau)}, \qquad \mathcal{V}^{(p)} = \operatorname*{arg\,min}_{\mathcal{V}' \subseteq \mathcal{V}} |\mathcal{V}'| \quad \text{s.t.} \quad \sum_{i \in \mathcal{V}'} P_i(\tau) \ge p$$</div>
+          <p class="small muted">$\tau\to0^+$ 时只剩最大的 $z_{i^*}$，退化为贪心解码；$\tau\to\infty$ 时 $P_i\to 1/|\mathcal V|$，退化为均匀瞎猜。Top-k 固定保留 $k$ 个词；Top-p 的候选池大小随语境自动伸缩：模型胸有成竹时只留一个词，面对开放问题时自动放宽。</p>
+          <p class="small muted">右侧玩具模型是一个手写的二元语法表（约 40 个词），每个词只给少数几个合理后继打高分，其余词（包括“香蕉、齿轮”这类离谱词）统一给很低的分。它足以复现 Holtzman 等人发现的两种退化：贪心时陷入复读，高温时滑进长尾胡言乱语。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>选“中国的首都是”，把 Top-k 设为 10、Top-p 设为 1：Top-k 硬拉进 9 个陪跑词；改用 Top-p = 0.9，候选池自动缩到 1 个。</li>
+            <li>选“周末我喜欢去”：同样的 Top-p = 0.9 需要圈进多少个词？这就是“自适应伸缩”。</li>
+            <li>点“贪心”后再生成：句子很快变成“今天天气真好，今天天气真好……”的复读机。</li>
+            <li>把 $\tau$ 拉到 1.5、Top-p 设为 1 再生成，离谱词纷纷出现（$\tau=2.5$ 时几乎整段胡话）；保持 $\tau=1.5$ 但把 Top-p 调到 0.7，长尾垃圾被一刀砍掉。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 2 ========================= -->
+  <section class="experiment" id="dpo" data-title="DPO 偏好损失">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">2</span>一条偏好数据</div>
+        <div class="explain small">
+          <div>提问 $x$：“什么是梯度下降？”</div>
+          <div style="margin-top:4px"><span class="tag teal">$y_w$ 好回答</span>沿负梯度方向小步更新参数，直到损失不再下降。</div>
+          <div style="margin-top:4px"><span class="tag coral">$y_l$ 坏回答</span>就是一种优化方法。</div>
+        </div>
+        <div id="beta-s"></div>
+        <div class="small muted" style="margin-top:6px">整句对数概率（可拖动，也可在右侧曲面上拖点）：</div>
+        <div id="lp-s"></div>
+        <div id="eta-s"></div>
+        <div class="btn-row">
+          <button class="btn" id="btn-step">梯度下降 1 步</button>
+          <button class="btn teal" id="btn-train">连续训练</button>
+          <button class="btn ghost" id="btn-reset2">重置</button>
+        </div>
+        <div class="caption">参考模型 $\pi_{\text{ref}}$ 保持冻结。初始时 $\pi_{\boldsymbol\theta}=\pi_{\text{ref}}$，两条回答的隐式奖励相等，损失为 $\ln 2$。</div>
+      </div>
+      <div class="stack">
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--coral)">L</span>损失与纠错权重</div>
+            <div class="viz h300" id="dpo-curve"></div>
+            <div class="legend">
+              <span><i style="background:var(--c4)"></i>$-\ln\sigma(\beta u)$</span>
+              <span><i style="background:var(--c1)"></i>权重 $\sigma(-\beta u)$</span>
+              <span><i style="background:var(--slate);opacity:.45"></i>其他 $\beta$</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--navy)">∇</span>损失曲面 $(\Delta_w,\Delta_l)$</div>
+            <div class="viz h300" id="dpo-surf"></div>
+            <div class="caption">等高线全是斜 45° 的直线：DPO 只关心差值 $u=\Delta_w-\Delta_l$，梯度永远沿 $(1,-1)$ 方向。</div>
+          </div>
+        </div>
+        <div class="stats" id="stats-dpo"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>三行推导：奖励模型是怎么被消掉的</div>
+          <div class="formula">$$\mathcal{L}_{\text{DPO}}(\boldsymbol{\theta}) = -\mathbb{E}\Big[\ln \sigma\big(\beta\,\underbrace{\ln \tfrac{\pi_{\boldsymbol{\theta}}(y_w \mid x)}{\pi_{\text{ref}}(y_w \mid x)}}_{\Delta_w} - \beta\,\underbrace{\ln \tfrac{\pi_{\boldsymbol{\theta}}(y_l \mid x)}{\pi_{\text{ref}}(y_l \mid x)}}_{\Delta_l}\big)\Big]$$</div>
+          <ol class="small" style="padding-left:20px;margin:6px 0">
+            <li>带 KL 约束的 RLHF 目标可以配凑成 $-\beta D_{\text{KL}}(\pi\,\|\,\pi^*)+\beta\ln Z(x)$，KL 非负，所以最优策略为 $\pi^*(y\mid x)=\frac{1}{Z(x)}\pi_{\text{ref}}(y\mid x)\exp\!\big(r(x,y)/\beta\big)$。</li>
+            <li>两边取对数移项：$r(x,y)=\beta\ln\frac{\pi^*(y\mid x)}{\pi_{\text{ref}}(y\mid x)}+\beta\ln Z(x)$。</li>
+            <li>代入 Bradley-Terry 概率 $\sigma\big(r(x,y_w)-r(x,y_l)\big)$，只与 $x$ 有关的 $\beta\ln Z(x)$ 一正一负抵消，得到上式。</li>
+          </ol>
+          <div class="formula">$$\nabla_{\boldsymbol{\theta}} \mathcal{L}_{\text{DPO}} = -\beta\, \mathbb{E}\big[\sigma(\hat r_l-\hat r_w)\,\big(\nabla_{\boldsymbol{\theta}} \ln \pi_{\boldsymbol{\theta}}(y_w \mid x) - \nabla_{\boldsymbol{\theta}} \ln \pi_{\boldsymbol{\theta}}(y_l \mid x)\big)\big],\qquad \hat r=\beta\ln\tfrac{\pi_{\boldsymbol\theta}}{\pi_{\text{ref}}}$$</div>
+          <p class="small muted">本实验把两条回答的对数概率 $\ln\pi_{\boldsymbol\theta}(y_w\mid x)$、$\ln\pi_{\boldsymbol\theta}(y_l\mid x)$ 当作两个自由参数，一步梯度下降就是：好回答加 $\eta\beta\sigma(-\beta u)$，坏回答减同样的量。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>点“连续训练”：损失从 $\ln 2\approx0.693$ 一路下降，纠错权重 $\sigma(-\beta u)$ 越来越小，训练自动“刹车”。</li>
+            <li>在曲面上把点拖到左上角（模型把坏回答抬得比好回答还高）：权重接近 1，这正是“判断越错，权重越大”。</li>
+            <li>把 $\beta$ 从 0.1 调到 0.5：曲线变陡，同样的对数概率差带来更大的隐式奖励差。</li>
+            <li>把 $\ln\pi_{\boldsymbol\theta}(y_w)$ 和 $\ln\pi_{\boldsymbol\theta}(y_l)$ 同时减 3：两个都变小了，但差值不变，损失纹丝不动。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 3 ========================= -->
+  <section class="experiment" id="speculative" data-title="投机采样">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">3</span>小模型打草稿，大模型批改</div>
+        <div class="explain kai">“我今天中午想吃<b>＿＿</b>”</div>
+        <div class="small muted">草稿模型 $q$ 的几种性格（也可直接在右图拖动琥珀色柱子）：</div>
+        <div id="spec-seg" style="margin:6px 0"></div>
+        <div id="gamma-s"></div>
+        <div id="cost-s"></div>
+        <div class="btn-row">
+          <button class="btn teal" id="btn-mc">蒙特卡洛验证</button>
+        </div>
+        <div class="caption">一次迭代：$q$ 连续猜 $\gamma$ 个词，$p$ 用 1 次并行前向批改。成本以“大模型前向 1 次”为单位，小模型一次前向的成本为 $c$。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">p</span>目标分布 $p$、草稿分布 $q$ 与残差分布<span class="sub">数字 = 接受率 $\min(1,p/q)$</span></div>
+          <div class="viz h300" id="spec-bars"></div>
+          <div class="legend">
+            <span><i style="background:var(--c1)"></i>大模型 $p(x)$</span>
+            <span><i style="background:var(--c2)"></i>草稿 $q(x)$（可拖动）</span>
+            <span><i style="background:var(--c4)"></i>残差 $p_{\text{residual}}(x)$</span>
+          </div>
+        </div>
+        <div class="stats" id="stats-spec"></div>
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c3)">γ</span>草稿长度与加速比</div>
+            <div class="viz h260" id="spec-speed"></div>
+            <div class="legend">
+              <span><i style="background:var(--c1)"></i>每次迭代产出词数</span>
+              <span><i style="background:var(--c3)"></i>加速比</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--teal)">MC</span>修正拒绝采样的输出分布</div>
+            <div class="viz h260" id="spec-mc"></div>
+            <div class="caption" id="mc-cap">点“蒙特卡洛验证”：按“接受或从残差补抽”的规则真实抽样，看看输出频率是否等于 $p$。</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\mathbb{P}(\text{接受 } \tilde{x}) = \min\!\Big(1, \frac{p(\tilde{x})}{q(\tilde{x})}\Big), \qquad p_{\text{residual}}(x) = \frac{\max(0,\, p(x) - q(x))}{\sum_{x'} \max(0,\, p(x') - q(x'))}$$</div>
+          <div class="formula">$$\mathbb{P}(\text{输出 } x) = \min\big(q(x), p(x)\big) + \max\big(0, p(x)-q(x)\big) = p(x)$$</div>
+          <div class="formula">$$\alpha=\sum_x\min\big(p(x),q(x)\big)=1-D_{\text{TV}}(p,q)$$</div>
+          <div class="formula">$$\mathbb{E}[\text{每次迭代词数}] = \frac{1 - \alpha^{\gamma+1}}{1 - \alpha},\qquad \text{加速比}=\frac{1-\alpha^{\gamma+1}}{(1-\alpha)(\gamma c+1)}$$</div>
+          <p class="small muted">词数公式假设每个位置的接受事件独立、接受率都是 $\alpha$：前 $i$ 个都被接受的概率是 $\alpha^i$，全部接受时大模型还能白送 1 个词。加速比公式来自 Leviathan 等人（2023），分母是一次迭代的耗时：$\gamma$ 次小模型前向加 1 次大模型前向。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>默认设置下 $\alpha=0.83$。按书中的 $\alpha\approx0.8$、$\gamma=5$ 估算，每次迭代约产出 $3.69$ 个词，看看右上图的读数。</li>
+            <li>选“过度自信”：$q$ 把宝全押在“火锅”上，被大模型频繁打回，$\alpha$ 掉到多少？最佳 $\gamma$ 怎么变？</li>
+            <li>点“蒙特卡洛验证”，再换成“南辕北辙”重做一次：无论 $q$ 多离谱，输出频率都贴着 $p$，变的只有速度。</li>
+            <li>把成本比 $c$ 调到 0.3：小模型不够“小”，加速比曲线很快掉头，$\gamma$ 不是越大越好。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

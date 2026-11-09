@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 5 章 · 在线实验室</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="assets/lab.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="assets/lab.js"></script>
+<script defer src="ch05.js"></script>
+</head>
+<body data-chapter="5">
+<main class="container">
+
+  <!-- ========================= 实验 1 ========================= -->
+  <section class="experiment" id="heatmap" data-title="注意力热力图">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">1</span>参数控制台</div>
+        <div class="small muted">输入序列：</div>
+        <div id="h-data" style="margin:6px 0 4px"></div>
+        <div id="h-dk"></div>
+        <div id="h-scale"></div>
+        <div id="h-mask"></div>
+        <div id="h-coref"></div>
+        <div class="btn-row"><button class="btn ghost" id="h-reseed">重新随机 $\mathbf Q,\mathbf K,\mathbf V$</button></div>
+        <div class="caption">点击热力图的某一行，下方会展开这个词的注意力分配；鼠标悬停（或手指轻触）查看单元格的得分。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">A</span>注意力权重 $\mathbf A=\operatorname{Softmax}\!\big((\mathbf Q\mathbf K^\top+\mathbf M)/\sqrt{d_k}\big)$<span class="sub">行 = 查询词 · 列 = 键词</span></div>
+          <div class="viz h420" id="h-heat"></div>
+        </div>
+        <div class="stats" id="h-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c2)">→</span><span id="h-rowtitle">第 t 个词把注意力分给了谁</span></div>
+          <div class="viz h260" id="h-row"></div>
+          <div class="caption">柱高为注意力权重 $a_{tj}$；词下方的小字是送进 Softmax 的得分（灰色表示被掩码遮住的未来位置）。</div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c3)">✍</span>书中手算算例：“小猫 / 抓 / 老鼠”，$d_k=d_v=4$<span class="sub">随左侧开关实时重算</span></div>
+          <div id="h-book" style="overflow-x:auto"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\operatorname{Attention}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \operatorname{Softmax}\!\left(\frac{\mathbf{Q}\mathbf{K}^\top + \mathbf{M}}{\sqrt{d_k}}\right)\mathbf{V}$$</div>
+          <div class="explain">一行公式干完五件事：$\mathbf Q\mathbf K^\top$ 全员相亲打分；$+\mathbf M$ 拉上防剧透窗帘（未来位置填 $-\infty$）；除以 $\sqrt{d_k}$ 给方差降温；逐行 Softmax 变成百分比；最后乘 $\mathbf V$ 按权重提货。</div>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>选“书中 3 词元算例”：第 2 行恰好是 $(0.018,\ 0.982,\ 0)$，第 3 行三个得分都是 2，均分为 $\tfrac13$。</li>
+            <li>关掉因果掩码：第 1 行“小猫”不再只能看自己，它会把 $86.7\%$ 的注意力给“老鼠”。</li>
+            <li>切到句子，点“它”这一行：打开“对齐”开关后，“它”把大部分注意力投给“小猫”；关掉后就只剩随机噪声。</li>
+            <li>关掉 $\sqrt{d_k}$ 缩放并把 $d_k$ 拉到 256：热力图几乎每行只剩一个格子是深色，Softmax 饱和了。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 2 ========================= -->
+  <section class="experiment" id="sqrt-dk" data-title="√dₖ 之谜">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">2</span>参数控制台</div>
+        <p class="small">$\mathbf q,\mathbf k_1,\dots,\mathbf k_T$ 的每个分量独立服从 $\mathcal N(0,1)$，得分 $z_j=\mathbf q^\top\mathbf k_j/(c\,\tau)$，其中 $c=\sqrt{d_k}$（缩放）或 $c=1$（不缩放）。</p>
+        <div id="s-dk"></div>
+        <div id="s-scale"></div>
+        <div id="s-T"></div>
+        <div id="s-tau"></div>
+        <div class="btn-row"><button class="btn ghost" id="s-resample">重新抽样</button></div>
+      </div>
+      <div class="stack">
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c1)">z</span>得分的分布</div>
+            <div class="viz h260" id="s-hist"></div>
+            <div class="caption" id="s-hcap"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c2)">a</span>一次抽样的 Softmax 输出</div>
+            <div class="viz h260" id="s-bars"></div>
+            <div class="caption">同一组随机向量，开关缩放前后对比。权重越集中于一根柱子，Softmax 越饱和。</div>
+          </div>
+        </div>
+        <div class="stats" id="s-stats"></div>
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--coral)">J</span>梯度范数 $\|\mathbf J_{\operatorname{Softmax}}\|_F$ 随 $d_k$ 的变化</div>
+            <div class="viz h260" id="s-jac"></div>
+            <div class="legend"><span><i style="background:var(--c3)"></i>除以 $\sqrt{d_k}$</span><span><i style="background:var(--c4)"></i>不除</span><span>每点 80 次蒙特卡洛</span></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--amber)">max</span>最大注意力权重 $\mathbb E[\max_j a_j]$</div>
+            <div class="viz h260" id="s-max"></div>
+            <div class="legend"><span><i style="background:var(--c3)"></i>除以 $\sqrt{d_k}$</span><span><i style="background:var(--c4)"></i>不除</span><span><i style="background:var(--slate)"></i>均匀 $1/T$</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\operatorname{Var}(\mathbf q^\top\mathbf k)=\sum_{i=1}^{d_k}\mathbb E[q_i^2]\,\mathbb E[k_i^2]=d_k\quad\Longrightarrow\quad \operatorname{Var}\!\Big(\frac{\mathbf q^\top\mathbf k}{\sqrt{d_k}}\Big)=1$$</div>
+          <div class="formula">$$\frac{\partial a_i}{\partial z_j} = a_i (\delta_{ij} - a_j) \quad \Longleftrightarrow \quad \mathbf{J}_{\operatorname{Softmax}}(\mathbf{z}) = \operatorname{diag}(\mathbf{a}) - \mathbf{a}\mathbf{a}^\top$$</div>
+          <div class="explain">不除以 $\sqrt{d_k}$，得分标准差按 $\sqrt{d_k}$ 膨胀，Softmax 被推成独热向量 $(1,0,\dots,0)$。把它代入雅可比矩阵：对角线 $a_i(1-a_i)=0$，非对角线 $-a_ia_j=0$，整个矩阵变成零，梯度再也传不回 $\mathbf W_Q,\mathbf W_K$。温度 $\tau$ 起的是同样的作用。</div>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>关掉缩放，把 $d_k$ 从 4 拉到 512：得分直方图越摊越宽，红色梯度曲线一路跌向 0（这正是书中图 5.1 右图）。</li>
+            <li>打开缩放：无论 $d_k$ 多大，得分标准差都稳定在 1，绿色曲线是一条水平线。</li>
+            <li>保持缩放，把温度 $\tau$ 调到 $0.2$：即使除了 $\sqrt{d_k}$，过低的温度也会把 Softmax 推进饱和区。</li>
+            <li>把 $T$ 调大：均匀分布时 $\|\mathbf J\|_F\approx 1/\sqrt T$，词越多，单个注意力头分到的梯度越少。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 3 ========================= -->
+  <section class="experiment" id="kv-cache" data-title="KV Cache 计算器">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">3</span>模型与推理设置</div>
+        <div class="control"><div class="control-head"><span>预设模型</span></div><select id="kv-preset"></select></div>
+        <div id="kv-L"></div>
+        <div id="kv-H"></div>
+        <div id="kv-dk"></div>
+        <div id="kv-G"></div>
+        <div id="kv-dc"></div>
+        <div id="kv-dR"></div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <div id="kv-T"></div>
+        <div id="kv-B"></div>
+        <div class="small muted">每个数值的字节数：</div>
+        <div id="kv-bytes" style="margin:6px 0 4px"></div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">KV</span>每个词元、每一层要缓存多少个数<span class="sub" id="kv-sub"></span></div>
+          <div class="viz h260" id="kv-bars"></div>
+        </div>
+        <div class="stats" id="kv-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c4)">GB</span>总显存随上下文长度增长</div>
+          <div class="viz h300" id="kv-curve"></div>
+          <div class="legend"><span><i style="background:var(--c1)"></i>MHA</span><span><i style="background:var(--c3)"></i>GQA</span><span><i style="background:var(--c2)"></i>MQA</span><span><i style="background:var(--c5)"></i>MLA</span><span><i style="background:var(--slate)"></i>24 GB / 80 GB 显卡</span></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c3)">≡</span>四大注意力变体对比（按当前参数实时计算）</div>
+          <div style="overflow-x:auto"><table class="data" id="kv-table"></table></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\text{显存}=\underbrace{(\text{每词元每层缓存的数})}_{2Hd_k\ /\ 2Gd_k\ /\ 2d_k\ /\ d_c+d_R}\times L\times T\times B\times(\text{每个数的字节})$$</div>
+          <div class="formula">$$\mathbf{q}_t^{(h)} (\mathbf{k}_j^{(h)})^\top = \mathbf{x}_t \underbrace{\Big(\mathbf{W}_Q^{(h)} (\mathbf{W}_{UK}^{(h)})^\top\Big)}_{\widetilde{\mathbf{W}}_Q^{(h)} \in \mathbb{R}^{d \times d_c}} (\mathbf{c}_j^{KV})^\top$$</div>
+          <div class="explain">GQA、MQA 让多个查询头共享同一组 $\mathbf K,\mathbf V$；MLA 只缓存一个 $d_c$ 维的潜在向量 $\mathbf c_t^{KV}$，靠矩阵结合律把解压矩阵 $\mathbf W_{UK}$ 预先乘进 $\mathbf W_Q$，推理时永远不必把历史的键解压出来。再加上一个 $d_R$ 维的共享 RoPE 旁路（解耦 RoPE）。</div>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>选 LLaMA-2-7B，把上下文拉到 128K：仅 KV Cache 就要 64 GB，单张 80 GB 显卡几乎放不下第二个请求。</li>
+            <li>切到 LLaMA-3-8B（8 组 GQA）：同样长度只要 MHA 的 25%，这就是表中“12.5%～25%”的来历。</li>
+            <li>保持 $H=32,\ d_k=128$，看 MQA 一栏：只剩 $2d_k/2Hd_k=1/32\approx3.1\%$。</li>
+            <li>选 DeepSeek-V3：128 个头本来要缓存 $2\times128\times128=32768$ 个数，MLA 只存 $512+64=576$ 个。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 8 章 · 在线实验室</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="assets/lab.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="assets/lab.js"></script>
+<script defer src="ch08.js"></script>
+</head>
+<body data-chapter="8">
+<main class="container">
+
+  <!-- ========================= 实验 1 ========================= -->
+  <section class="experiment" id="router" data-title="Top-k 路由与负载均衡">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">1</span>分诊台参数</div>
+        <div class="btn-row" style="margin-top:0">
+          <button class="btn amber" id="m-book">书中 4 专家 Top-2 算例</button>
+          <button class="btn ghost" id="m-random">随机批次</button>
+        </div>
+        <div id="m-E"></div>
+        <div id="m-k"></div>
+        <div id="m-T"></div>
+        <div id="m-skew"></div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <div class="small" style="font-weight:650;color:var(--navy)">DeepSeek-V3 无辅助损失均衡</div>
+        <div id="m-gamma"></div>
+        <div class="btn-row">
+          <button class="btn teal" id="m-run">▶ 自动更新偏置</button>
+          <button class="btn ghost" id="m-step">单步</button>
+          <button class="btn ghost" id="m-reset">清零偏置</button>
+        </div>
+        <div class="caption">每一步换一批新词元，按 $b_i\leftarrow b_i+\gamma\,\operatorname{sign}(\bar c-c_i)$ 调整偏置：超载的专家偏置调小，闲置的调大。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">p</span>路由概率 $p_{t,i}$ 与 Top-k 选择<span class="sub">点一列查看该词元</span></div>
+          <div class="viz h260" id="m-grid" style="touch-action:none"></div>
+          <div class="caption" id="m-token"></div>
+        </div>
+        <div class="stats" id="m-stats"></div>
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c2)">f</span>各专家负载</div>
+            <div class="viz h260" id="m-load"></div>
+            <div class="legend"><span><i style="background:var(--c2)"></i>实际接单比例 $f_i$</span><span><i style="background:var(--c1)"></i>平均路由概率 $P_i$</span><span><i style="background:var(--slate);height:2px"></i>均匀值 $k/E$、$1/E$</span></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c6)">b</span>偏置更新轨迹</div>
+            <div class="viz h260" id="m-hist"></div>
+            <div class="legend"><span><i style="background:var(--c4)"></i>最大负载 / 平均负载</span><span><i style="background:var(--c5)"></i>$\mathcal L_{\text{aux}}/k$</span></div>
+          </div>
+        </div>
+        <div class="card" id="m-hand-card">
+          <div class="card-title"><span class="dot" style="background:var(--amber)">✎</span>逐项算出 $\mathcal L_{\text{aux}}$</div>
+          <div style="overflow-x:auto"><table class="data" id="m-table"></table></div>
+          <div class="formula">$$\mathcal{L}_{\text{aux}} = \alpha \, E \sum_{i=1}^{E} f_i \cdot P_i,\qquad f_i = \frac{1}{T}\sum_{t=1}^T \mathbb{I}(i \in \operatorname{TopK}_t),\qquad P_i = \frac{1}{T}\sum_{t=1}^T p_{t,i}$$</div>
+          <p class="small muted">表中取 $\alpha=1$。$\sum_i f_i=k$、$\sum_i P_i=1$，当且仅当 $f_i=k/E,\;P_i=1/E$ 时 $E\sum_i f_iP_i$ 取到最小值 $k$。反向传播时 $f_i$ 当作常数，$P_i$ 受到的下压力度 $\propto E f_i$：接单越多，罚得越狠。无辅助损失方案只在选 Top-$k$ 时用 $s_i+b_i$，加权时仍用原始概率，所以 $P_i$ 不变而 $f_i$ 被拉平。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>点“书中 4 专家 Top-2 算例”：表格逐项复现 $f=(1,0.5,0.5,0)$、$P=(0.55,0.20,0.15,0.10)$，$\mathcal L_{\text{aux}}=2.90&gt;k=2$。点格子可以改选哪个词元查看门控权重 $0.625/0.375$。</li>
+            <li>回到随机批次，把倾斜度拉到 3：一两个“明星专家”包揽大部分词元，好几个专家一单没接（路由坍缩）。</li>
+            <li>点“自动更新偏置”：偏置更新轨迹中的最大负载/平均负载很快逼近 1，负载图里的橙色柱子被拉平；但蓝色的 $P_i$ 几乎不动，因为偏置不参与加权。</li>
+            <li>把倾斜度调成 0：即使不加任何约束，随机波动也会让负载并不完全均匀，$\mathcal L_{\text{aux}}$ 略高于 $k$。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 2 ========================= -->
+  <section class="experiment" id="ssm" data-title="SSM 选择性记忆">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">2</span>状态空间模型</div>
+        <div class="control"><div class="control-head"><span>步长模式</span></div><div id="s-mode"></div></div>
+        <div id="s-dfix"></div>
+        <div id="s-dlow"></div>
+        <div id="s-dhigh"></div>
+        <div id="s-N"></div>
+        <div id="s-tstar"></div>
+        <div class="btn-row">
+          <button class="btn ghost" id="s-reset">恢复默认序列</button>
+          <button class="btn ghost" id="s-clear">清空关键词</button>
+        </div>
+        <div class="caption">$\mathbf A=-\operatorname{diag}(1,2,\dots,N)$（HiPPO 的对角特征值），$\mathbf B=\mathbf 1$，$C_n=n/N$（让稳态增益为 1）。在输入序列图上点按可以添加或删除关键词。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c2)">x</span>输入序列与步长 $\Delta_t$<span class="sub">点按添加 / 删除关键词</span></div>
+          <div class="viz h260" id="s-input" style="touch-action:none; cursor:crosshair"></div>
+          <div class="legend"><span><i style="background:var(--c2)"></i>关键词</span><span><i style="background:#b8c4d2"></i>废话词（小噪声）</span><span><i style="background:var(--c6);opacity:.5"></i>步长 $\Delta_t$（右轴，对数）</span></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">h</span>隐状态 $\mathbf h_t$ 与输出 $y_t=\mathbf C\mathbf h_t$</div>
+          <div class="viz h260" id="s-state"></div>
+          <div class="legend" id="s-state-legend"></div>
+        </div>
+        <div class="stats" id="s-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c5)">K</span>第 $t^*$ 步输出对每个历史输入的权重<span class="sub">半可分矩阵的一行</span></div>
+          <div class="viz h260" id="s-kernel"></div>
+          <div class="caption">固定 $\Delta$ 时这一行就是卷积核 $\bar K_k=\mathbf C\bar{\mathbf A}^k\bar{\mathbf B}$ 倒过来：越久远权重越小，与内容无关。选择性 $\Delta_t$ 时权重由内容决定：废话词几乎不占权重，也不会冲淡之前的记忆。</div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\mathbf{h}_t = \overline{\mathbf{A}}_t \mathbf{h}_{t-1} + \overline{\mathbf{B}}_t x_t,\quad y_t = \mathbf{C}_t \mathbf{h}_t,\qquad \overline{\mathbf{A}}_t = \exp(\Delta_t \mathbf{A}),\quad \overline{\mathbf{B}}_t = (\Delta_t \mathbf{A})^{-1}\big(\exp(\Delta_t \mathbf{A}) - \mathbf{I}\big)\Delta_t \mathbf{B}_t$$</div>
+          <div class="formula">$$y_t = \sum_{j=1}^t \Big(\prod_{k=j+1}^t \overline{a}_k\Big) (\mathbf{c}_t^\top \mathbf{b}_j)\, x_j,\qquad \mathbf y=\big(\mathbf L\odot(\mathbf C\mathbf B^\top)\big)\mathbf x$$</div>
+          <p class="small muted">对角 $\mathbf A$ 时每个通道独立：$\bar a_n=e^{-\Delta a_n}$，$\bar b_n=(1-e^{-\Delta a_n})/a_n$。$\Delta_t\to0$ 时 $\bar a\to1,\ \bar b\to0$，模型闭上耳朵保留旧记忆；$\Delta_t$ 很大时 $\bar a\to0$，旧记忆被清空，当前输入被整个刻进状态。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>切到“固定 $\Delta$”（默认 0.15）：每个关键词十几步内就指数衰减殆尽，废话词还在不停往状态里掺噪声。权重图变成一条与内容无关的衰减曲线。</li>
+            <li>切到“选择性 $\Delta_t$”：输出 $y_t$ 变成一段段平台，每个关键词被稳稳记住，直到下一个关键词把它覆盖。</li>
+            <li>把“关键词的 $\Delta$”调小到 0.3：新关键词写不满状态，新旧记忆混在一起。</li>
+            <li>在输入序列图末尾附近点一个新的关键词，再把观察时刻 $t^*$ 拖到它之前和之后，比较权重条形图。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 3 ========================= -->
+  <section class="experiment" id="wall" data-title="复杂度墙与激活参数">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">3</span>两堵墙</div>
+        <div id="w-T"></div>
+        <div class="control"><div class="control-head"><span>模型宽度 $d$</span></div><div id="w-d"></div></div>
+        <div id="w-W"></div>
+        <div class="control"><div class="control-head"><span>SSM 状态维 $N$</span></div><div id="w-N"></div></div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <div class="control"><div class="control-head"><span>MoE 架构</span></div><div id="w-preset"></div></div>
+        <div id="w-E"></div>
+        <div id="w-k"></div>
+        <div class="caption">参数按真实配置逐层累加：嵌入与输出头、注意力（DeepSeek-V3 为 MLA，Mixtral 为 GQA）、稠密 FFN、共享专家、路由专家（SwiGLU，每个专家 $3dd_{\text{ff}}$）。</div>
+      </div>
+      <div class="stack">
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c4)">T²</span>每层序列混合的计算量</div>
+            <div class="viz h260" id="w-flops"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c1)">GB</span>推理缓存（每层，BF16）</div>
+            <div class="viz h260" id="w-mem"></div>
+          </div>
+        </div>
+        <div class="legend" style="margin-top:-8px"><span><i style="background:var(--c4)"></i>全注意力 $4T^2d$ / KV $2Td$</span><span><i style="background:var(--c2)"></i>滑动窗口 $4TWd$ / $2Wd$</span><span><i style="background:var(--c6)"></i>SSM 扫描 $\approx 6TNd$ / 状态 $Nd$</span><span><i style="background:var(--slate);height:2px"></i>虚线：线性投影 $8Td^2$（谁都要付）</span></div>
+        <div class="stats" id="w-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c3)">MoE</span>总参数 vs 每个词元激活的参数</div>
+          <div class="viz h260" id="w-moe"></div>
+          <div class="legend" id="w-moe-legend"></div>
+        </div>
+        <div class="stats" id="w-stats2"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>复杂度对照</div>
+          <div style="overflow-x:auto"><table class="data">
+            <tr><th>架构模块</th><th>训练总计算</th><th>单步推理</th><th>推理缓存</th></tr>
+            <tr><td>Softmax Attention</td><td>$\mathcal O(T^2d)$</td><td>$\mathcal O(Td)$</td><td>$\mathcal O(Td)$</td></tr>
+            <tr><td>Sparse MoE FFN</td><td>$\mathcal O(Tkd_{\text{ff}})$</td><td>$\mathcal O(kd_{\text{ff}})$</td><td>$\mathcal O(Edd_{\text{ff}})$ 常驻参数</td></tr>
+            <tr><td>SSM / Mamba</td><td>$\mathcal O(TNd)$</td><td>$\mathcal O(Nd)$</td><td>$\mathcal O(Nd)$ 常数</td></tr>
+          </table></div>
+          <p class="small muted" style="margin-bottom:0">上下文从 4K 扩到 100 万（250 倍）时，$T^2$ 项暴涨 $250^2=62{,}500$ 倍。MoE 不缩小显存里的参数，而是让每个词元只走 $k$ 个专家，用总参数的一小部分完成一次前向。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>把 $T$ 从 1K 拖到 1M（$d=4096$）：注意力打分 $4T^2d$ 与线性投影 $8Td^2$ 之比为 $T/2d$，从 1/8 涨到 128 倍；每层 KV 缓存涨到 17 GB，而 SSM 状态始终是 131 KB。</li>
+            <li>滑动窗口在 $T&lt;W$ 时与全注意力重合，超过 $W$ 后变成线性。它省下了算力，代价是看不到窗口外的原文。</li>
+            <li>选 DeepSeek-V3：总参数约 671B，每个词元只激活约 37B（约 5.6%）。把 Top-$k$ 从 8 改成 16，激活参数和每词元 FLOPs 跟着涨。</li>
+            <li>切到 Mixtral 8×7B：46.7B 总参数、12.9B 激活。名字里的 8×7B 并不等于 56B，因为注意力和嵌入是共享的。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

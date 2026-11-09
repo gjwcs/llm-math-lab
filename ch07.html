@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 7 章 · 在线实验室</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="assets/lab.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="assets/lab.js"></script>
+<script defer src="ch07.js"></script>
+</head>
+<body data-chapter="7">
+<main class="container">
+
+  <!-- ========================= 实验 1 ========================= -->
+  <section class="experiment" id="depth" data-title="百层信号传播">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">1</span>搭一个百层网络</div>
+        <p class="small">每层含两个随机子层（模拟注意力与 FFN），支路为 $\mathcal F(\mathbf z)=\mathbf W\,\mathrm{ReLU}(\mathbf z)$，$W_{ij}\sim\mathcal N(0,\,2g^2/d)$。三种连法共用同一组权重：</p>
+        <div class="legend" style="margin:0 0 6px">
+          <span><i style="background:var(--c4)"></i>无残差 $\mathbf x_{l+1}=\mathcal F_l(\mathbf x_l)$</span>
+          <span><i style="background:var(--c2)"></i>Post-LN</span>
+          <span><i style="background:var(--c1)"></i>Pre-LN</span>
+        </div>
+        <div id="d-L"></div>
+        <div id="d-g"></div>
+        <div class="control"><div class="control-head"><span>宽度 $d$</span></div><div id="d-width"></div></div>
+        <div id="d-scale"></div>
+        <div class="btn-row"><button class="btn ghost" id="d-resample">重新采样权重</button></div>
+        <div class="caption">损失取 $\mathcal L=\langle\mathbf u,\mathbf x_L\rangle$（$\mathbf u$ 为随机单位向量），于是顶层梯度范数恰为 1。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">→</span>前向：每层激活的均方根 $\operatorname{RMS}(\mathbf x_l)$<span class="sub">对数纵轴</span></div>
+          <div class="viz h260" id="d-fwd"></div>
+          <div class="legend"><span><i style="background:var(--c4)"></i>无残差</span><span><i style="background:var(--c2)"></i>Post-LN</span><span><i style="background:var(--c1)"></i>Pre-LN</span><span><i style="background:var(--slate);height:2px"></i>虚线：理论预测 $g^{k}$ 与 $\sqrt{1+k\,g^2s^2}$</span></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--coral)">←</span>反向：梯度范数 $\|\partial\mathcal L/\partial\mathbf x_l\|$<span class="sub">梯度从右往左传</span></div>
+          <div class="viz h260" id="d-bwd"></div>
+          <div class="legend"><span><i style="background:var(--c4)"></i>无残差</span><span><i style="background:var(--c2)"></i>Post-LN</span><span><i style="background:var(--c1)"></i>Pre-LN</span><span><i style="background:var(--c2);height:2px;opacity:.6"></i>琥珀虚线：Post-LN 中只走恒等直通路的那部分梯度</span></div>
+        </div>
+        <div class="stats" id="d-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\text{Post-LN: }\mathbf x_{l+1}=\operatorname{Norm}\big(\mathbf x_l+\mathcal F_l(\mathbf x_l)\big)\qquad \text{Pre-LN: }\mathbf x_{l+1}=\mathbf x_l+\mathcal F_l\big(\operatorname{Norm}(\mathbf x_l)\big)$$</div>
+          <div class="formula">$$\frac{\partial \mathcal{L}}{\partial \mathbf{x}_l} = \frac{\partial \mathcal{L}}{\partial \mathbf{x}_L} \Big( \mathbf{I} + \frac{\partial}{\partial \mathbf{x}_l} \sum_{i=l}^{L-1} \mathcal{F}_i\big(\operatorname{Norm}(\mathbf{x}_i)\big) \Big)$$</div>
+          <div class="formula">$$\operatorname{Var}(\mathbf{x}_L) = \operatorname{Var}(\mathbf{x}_0) + \sum_{k=1}^{2L} \frac{\sigma_0^2}{2L} = \operatorname{Var}(\mathbf{x}_0) + \sigma_0^2$$</div>
+          <p class="small muted">无残差时梯度是 $2L$ 个雅可比的连乘，每层放大或缩小约 $g$ 倍，于是整体按 $g^{2L}$ 爆炸或消失。Pre-LN 的单位矩阵 $\mathbf I$ 让顶层梯度原样直达底层；Post-LN 的直通路每过一层都要乘一次 $\operatorname{Norm}$ 的雅可比（约除以 $\operatorname{RMS}(\mathbf x+\mathcal F)$），高速公路被逐层截断。勾选 $1/\sqrt{2L}$ 后，支路输出方差变为 $\sigma_0^2/2L$，残差流方差不再随深度线性膨胀。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>把增益 $g$ 从 0.9 拖到 1.1：无残差网络的首层梯度从 $10^{-10}$ 量级翻到 $10^{7}$ 量级，只有 $g=1$（Kaiming 临界初始化）附近能勉强维持。蓝色的 Pre-LN 几乎纹丝不动。</li>
+            <li>看琥珀色曲线：Post-LN 顶层梯度是 1，传到底层只剩百分之一左右，正是书中说的“顶层梯度远大于底层”。虚线是只走恒等直通路的那部分，每个子层被除以约 $\sqrt{1+g^2}$，百层后小到 $10^{-27}$ 以下；Pre-LN 的这一项恒等于 1。</li>
+            <li>勾选“支路输出 $\times 1/\sqrt{2L}$”：Pre-LN 末层 RMS 从约 $\sqrt{1+2Lg^2}$ 降到约 $\sqrt{1+g^2}$，Post-LN 的直通分量也被保住了。</li>
+            <li>把层数拉到 4：浅网络里三种连法差别不大，深度才是放大器。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 2 ========================= -->
+  <section class="experiment" id="rmsnorm" data-title="RMSNorm 超球面">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">2</span>把向量拉回球面</div>
+        <div class="control"><div class="control-head"><span>归一化方式</span></div><div id="n-mode"></div></div>
+        <div class="control"><div class="control-head"><span>维度</span></div><div id="n-dim"></div></div>
+        <div id="n-mu"></div>
+        <div id="n-alpha"></div>
+        <div id="n-t"></div>
+        <div class="btn-row">
+          <button class="btn teal" id="n-play">▶ 播放投影</button>
+          <button class="btn ghost" id="n-resample">换一团点</button>
+        </div>
+        <div class="caption">3D 视图可以拖动旋转。$\varepsilon=10^{-5}$ 放在根号里。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c6)">◯</span>点云与它们的归一化像<span class="sub" id="n-sub"></span></div>
+          <div class="viz sq" id="n-view" style="max-height:460px; touch-action:none; cursor:grab"></div>
+          <div class="legend"><span><i style="background:#b8c4d2"></i>输入 $\mathbf x$</span><span><i style="background:var(--c6)"></i>输出 $\operatorname{Norm}(\mathbf x)$</span><span><i style="background:var(--c4);height:2px"></i>$\mathbf 1=(1,\dots,1)$ 方向</span></div>
+        </div>
+        <div class="stats" id="n-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">J</span>雅可比 = 切向投影<span class="sub">$d=2$，拖动两个圆点</span></div>
+          <div class="row2">
+            <div class="viz sq" id="n-jac" style="max-height:360px; touch-action:none"></div>
+            <div>
+              <div class="stats" id="n-jstats"></div>
+              <div class="legend" style="margin-top:10px"><span><i style="background:var(--navy)"></i>输入 $\mathbf x$</span><span><i style="background:var(--c6)"></i>输出 $\operatorname{RMSNorm}(\mathbf x)$ 与切向分量</span><span><i style="background:var(--c2)"></i>上游梯度 $\mathbf g$</span><span><i style="background:var(--c4)"></i>径向分量（被清零）</span><span><i style="background:var(--c5)"></i>传回输入的梯度 $\mathbf J^\top\mathbf g$</span></div>
+              <p class="small muted">梯度 $\mathbf g$ 在输出点被拆成两半：沿半径的那一半只会改变长度，而长度反正会被归一化抹掉，所以被精准清零；沿切线的那一半改变方向，被放行并乘上 $\sqrt d/\|\mathbf x\|$。输入越长，传回的梯度越小。</p>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">∑</span>背后的公式</div>
+          <div class="formula">$$\operatorname{RMSNorm}(\mathbf{x}) = \frac{\mathbf{x}}{\operatorname{RMS}(\mathbf{x})} \odot \boldsymbol{\gamma},\qquad \operatorname{RMS}(\mathbf{x}) = \sqrt{\frac{1}{d}\sum_{i=1}^{d} x_i^2 + \varepsilon}$$</div>
+          <div class="formula">$$\frac{\partial \operatorname{RMSNorm}(\mathbf{x})}{\partial \mathbf{x}} = \frac{\sqrt{d}}{\|\mathbf{x}\|_2}\left(\mathbf{I} - \frac{\mathbf{x}\mathbf{x}^\top}{\|\mathbf{x}\|_2^2}\right),\qquad \Big(\mathbf{I} - \frac{\mathbf{x}\mathbf{x}^\top}{\|\mathbf{x}\|_2^2}\Big)\mathbf x=\mathbf 0$$</div>
+          <p class="small muted">忽略 $\varepsilon$ 时 $\mathbf x/\operatorname{RMS}(\mathbf x)=\sqrt d\,\mathbf x/\|\mathbf x\|_2$：方向不变，长度被拉到 $\sqrt d$（这里取 $\boldsymbol\gamma=\mathbf 1$）。LayerNorm 还要先减去均值，相当于先投影到与 $\mathbf 1$ 正交的超平面，再拉到那里的球面上。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>拖动“整体缩放 $\alpha$”：输入点云忽大忽小，输出纹丝不动，这就是尺度不变性 $\operatorname{RMSNorm}(\alpha\mathbf x)=\operatorname{RMSNorm}(\mathbf x)$。把 $\alpha$ 降到 $10^{-3}$ 时，$\varepsilon$ 开始起作用，输出被拉向球心。</li>
+            <li>切到 LayerNorm 并调大偏移 $\mu$：沿 $\mathbf 1$ 方向的平移被整个减掉，三维点全部落在一个大圆上（只剩 $d-1$ 个自由度）。</li>
+            <li>在 $d=2$ 下用 LayerNorm：所有点只剩两个去处 $\pm(1,-1)$。这就是为什么低维里“减均值”代价很大，高维里却几乎无感。</li>
+            <li>在雅可比图里把梯度 $\mathbf g$ 拖到与 $\mathbf x$ 同向：传回的梯度变成 0，径向梯度被精准清零。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 3 ========================= -->
+  <section class="experiment" id="gating" data-title="门控激活与秩坍缩">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">3</span>激活函数与门控</div>
+        <div id="g-beta"></div>
+        <div id="g-deriv"></div>
+        <div class="control"><div class="control-head"><span>门控曲面使用的激活</span></div><div id="g-kind"></div></div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+        <div class="card-title" style="margin-bottom:4px"><span class="dot" style="background:var(--coral)">1</span>秩坍缩：$T=8$ 个词，$d=16$</div>
+        <div id="r-layer"></div>
+        <div id="r-tau"></div>
+        <div class="btn-row"><button class="btn ghost" id="r-resample">重新采样</button></div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c6)">σ</span>ReLU、GELU 与 $\operatorname{Swish}_\beta$</div>
+          <div class="viz h300" id="g-act"></div>
+          <div class="legend"><span><i style="background:var(--slate)"></i>ReLU</span><span><i style="background:var(--c2)"></i>GELU $=z\,\Phi(z)$</span><span><i style="background:var(--c6)"></i>$\operatorname{Swish}_\beta(z)=z\,\sigma(\beta z)$</span><span><i style="background:var(--c4);height:2px"></i>虚线为导数</span></div>
+          <div class="formula">$$\operatorname{SwiGLU}(\mathbf{x}) = \Big(\operatorname{Swish}_1(\mathbf{x}\mathbf{W}_{\text{gate}}) \odot (\mathbf{x}\mathbf{W}_{\text{up}})\Big)\mathbf{W}_{\text{down}},\qquad \operatorname{Swish}_\beta(z) = \frac{z}{1 + e^{-\beta z}}$$</div>
+          <p class="small muted" style="margin:0">$\beta=0$ 时 $\operatorname{Swish}_0(z)=z/2$ 是直线；$\beta\to\infty$ 时 $\sigma(\beta z)$ 变成阶跃函数，$\operatorname{Swish}_\infty$ 精确退化为 ReLU。导数 $\operatorname{Swish}_\beta'(z)=\sigma(\beta z)+\beta z\,\sigma(\beta z)\big(1-\sigma(\beta z)\big)$ 在负半轴不为 0。</p>
+        </div>
+        <div class="stats" id="g-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c5)">⊙</span>门控曲面 $\phi(a)\cdot b$<span class="sub">点按或拖动查看数值</span></div>
+          <div class="row2">
+            <div class="viz sq" id="g-surf" style="max-height:360px; touch-action:none"></div>
+            <div>
+              <div class="formula" id="g-probe"></div>
+              <p class="small muted">横轴 $a=\mathbf x\mathbf W_{\text{gate}}$ 是门控支路，纵轴 $b=\mathbf x\mathbf W_{\text{up}}$ 是内容支路，颜色红正蓝负，细线为等值线。沿 $b$ 方向输出是直线，沿 $a$ 方向是“调光旋钮”：$a$ 很负时门被拧死，$a$ 为正时开度近似 $a$ 本身，于是输出近似 $ab$，这就是二阶交叉项。</p>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--coral)">1</span>秩坍缩：纯注意力把所有词揉成同一个向量</div>
+          <div class="row2">
+            <div class="viz h260" id="r-scatter"></div>
+            <div class="viz h260" id="r-curve"></div>
+          </div>
+          <div class="legend"><span><i style="background:var(--c4)"></i>纯注意力 $\mathbf X_{l+1}=\mathbf A_l\mathbf X_l\mathbf W_V$</span><span><i style="background:var(--c1)"></i>加残差 $\mathbf X_{l+1}=\mathbf X_l+\mathbf A_l\operatorname{Norm}(\mathbf X_l)\mathbf W_V$</span></div>
+          <div class="caption">散点：第 $l$ 层 8 个词向量在初始主成分平面上的投影（按整体 RMS 缩放）。曲线：相对残差 $\|\mathbf X-\mathbf 1\bar{\mathbf x}^\top\|_F/\|\mathbf X\|_F$，即到“所有行都相同”的秩 1 矩阵的距离。落到 $10^{-16}$ 就是 float64 的机器精度。</div>
+        </div>
+        <div class="stats" id="r-stats"></div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>把 $\beta$ 拖到 0 再拖到 10：Swish 从直线 $z/2$ 一路变成 ReLU。$\beta=1$ 时最低点约为 $-0.278$（在 $z\approx-1.278$ 处）。</li>
+            <li>勾选导数：ReLU 在负半轴导数恒为 0（神经元坏死），Swish 和 GELU 的导数在负半轴仍有一点点，梯度还能传回去。</li>
+            <li>在门控曲面上点 $a&lt;-3$ 的区域：不管内容 $b$ 多大，输出都接近 0，门被拧死了。</li>
+            <li>看秩坍缩的残差曲线：纯注意力的残差按“指数的指数”掉到机器精度，大约 4 层就把 8 个词揉成一个；加上残差后几十层仍保留差异。调大锐度 $\tau$ 能拖慢但挡不住坍缩。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

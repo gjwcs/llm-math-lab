@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大模型的数学基础 · 在线交互实验室 | 顾嘉伟 李泽超 著</title>
+<meta name="description" content="《大模型的数学基础：从人类直觉、算法公理到零算力实战》配套在线交互实验室：16 章、48 个可拖动、可计算的数学实验，全部在浏览器本地运行。">
+<link rel="stylesheet" href="assets/lab.css">
+<script defer src="assets/lab.js"></script>
+</head>
+<body>
+<div id="top"></div>
+<section class="home-hero">
+  <canvas id="net"></canvas>
+  <div class="inner">
+    <div class="eyebrow" style="font-family:var(--font-num);letter-spacing:.16em;font-size:12.5px;color:#9fd3d3;font-weight:600">INTERACTIVE MATH LAB · 配套在线实验室</div>
+    <h1>大模型的数学基础</h1>
+    <div class="subtitle">从人类直觉、算法公理到零算力实战</div>
+    <div class="en">Mathematical Foundations of Large Language Models</div>
+    <div class="authors"><span>顾嘉伟 · 清华大学深圳国际研究生院</span><span>李泽超 · 南京理工大学</span></div>
+    <p class="lead">书中每一章都配有一个在线实验室。拖动滑块、点一点按钮，亲眼看见交叉熵如何“开罚单”、高维向量为何几乎两两正交、√dₖ 怎样把梯度从死区里救回来、RoPE 如何在复平面上旋转。所有计算都在你的浏览器里完成，不需要显卡，也不需要安装任何软件。</p>
+    <div class="btn-row" style="margin-top:22px"><a class="btn amber" href="assets/cpu_practice_code.py" download>⬇ 下载全书 CPU 实验脚本 cpu_practice_code.py</a><a class="btn ghost" href="ch01.html" style="background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.25)">从第 1 章开始 →</a></div>
+  </div>
+</section>
+<main class="container" id="parts"></main>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('top').outerHTML = LAB.topbar(0);
+  const host = document.getElementById('parts');
+  LAB.PARTS.forEach((p, k) => {
+    const cards = LAB.CHAPTERS.filter((c) => c.part === k).map((c) => `
+      <a class="chapter-card" href="${LAB.chapterUrl(c.n)}">
+        <span class="cno">${LAB.pad2(c.n)}</span>
+        <span class="icon" style="background:${c.color}">${c.icon}</span>
+        <h3>第 ${c.n} 章　${c.title}</h3>
+        <p><b style="color:var(--navy);font-weight:600">${c.sub}</b></p>
+        <p>${c.demo}</p>
+        <span class="go">进入实验 →</span>
+      </a>`).join('');
+    host.insertAdjacentHTML('beforeend', `<section class="part-block"><div class="part-head"><span class="no">${p.no}</span><h2>${p.title}</h2></div>
+      <div class="part-head" style="margin-top:-10px"><span class="en">${p.en}</span></div><div class="chapter-grid">${cards}</div></section>`);
+  });
+  document.body.insertAdjacentHTML('beforeend', LAB.FOOTER);
+  // 首页背景：缓慢漂移的“注意力”网络
+  const cv = document.getElementById('net'), ctx = cv.getContext('2d');
+  const R = LAB.rng(7), N = 46; let pts = [];
+  function size() { const r = cv.getBoundingClientRect(), d = Math.min(devicePixelRatio || 1, 2); cv.width = r.width * d; cv.height = r.height * d; ctx.setTransform(d, 0, 0, d, 0, 0); pts = LAB.M.range(N).map(() => ({ x: R() * r.width, y: R() * r.height, vx: (R() - .5) * .25, vy: (R() - .5) * .25 })); }
+  size(); addEventListener('resize', size);
+  (function loop() {
+    const w = cv.clientWidth, h = cv.clientHeight; ctx.clearRect(0, 0, w, h);
+    pts.forEach((p) => { p.x += p.vx; p.y += p.vy; if (p.x < 0 || p.x > w) p.vx *= -1; if (p.y < 0 || p.y > h) p.vy *= -1; });
+    for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) { const a = pts[i], b = pts[j], d = Math.hypot(a.x - b.x, a.y - b.y); if (d < 150) { ctx.strokeStyle = `rgba(160,220,220,${(1 - d / 150) * .45})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); } }
+    pts.forEach((p, i) => { ctx.fillStyle = i % 5 === 0 ? 'rgba(224,154,45,.9)' : 'rgba(255,255,255,.8)'; ctx.beginPath(); ctx.arc(p.x, p.y, i % 5 === 0 ? 2.6 : 1.8, 0, 7); ctx.fill(); });
+    requestAnimationFrame(loop);
+  })();
+});
+</script>
+</body>
+</html>

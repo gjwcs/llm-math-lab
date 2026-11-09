@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 9 章 · 在线实验室</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="assets/lab.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="assets/lab.js"></script>
+<script defer src="ch09.js"></script>
+</head>
+<body data-chapter="9">
+<main class="container">
+
+  <!-- ========================= 实验 1 ========================= -->
+  <section class="experiment" id="race" data-title="地形赛跑">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">1</span>选地形、调步长</div>
+        <div class="control"><div class="control-head"><span>损失地形</span></div><div id="o-land"></div></div>
+        <div class="formula" id="o-formula" style="font-size:13px"></div>
+        <div id="o-opts"></div>
+        <div id="o-lam"></div>
+        <div id="o-noise"></div>
+        <div id="o-sigma"></div>
+        <div id="o-speed"></div>
+        <div class="btn-row">
+          <button class="btn teal" id="o-play">▶ 开始</button>
+          <button class="btn ghost" id="o-reset">重置</button>
+        </div>
+        <div class="caption">在等高线图上点按或拖动，设置共同的起点。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c4)">θ</span>四个优化器同时下山<span class="sub" id="o-step">第 0 步</span></div>
+          <div class="viz h380" id="o-map" style="touch-action:none; cursor:crosshair"></div>
+          <div class="legend"><span><i style="background:var(--c4)"></i>SGD</span><span><i style="background:var(--c2)"></i>Momentum</span><span><i style="background:var(--c1)"></i>Adam</span><span><i style="background:var(--c3)"></i>AdamW</span><span><i style="background:var(--ink);height:8px;width:8px;border-radius:50%"></i>全局最小值</span></div>
+        </div>
+        <div class="small muted" style="margin:-6px 0 -10px">当前损失差 $\mathcal L(\boldsymbol\theta_t)-\mathcal L^*$：</div>
+        <div class="stats" id="o-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">L</span>损失随步数下降 $\mathcal L(\boldsymbol\theta_t)-\mathcal L^*$<span class="sub">对数纵轴</span></div>
+          <div class="viz h260" id="o-loss"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\begin{aligned}\text{SGD:}\quad & \boldsymbol\theta_t=\boldsymbol\theta_{t-1}-\eta\,\mathbf g_t\\ \text{Momentum:}\quad & \mathbf{m}_t = \beta_1 \mathbf{m}_{t-1} + (1 - \beta_1)\mathbf{g}_t,\quad \boldsymbol\theta_t=\boldsymbol\theta_{t-1}-\eta\,\mathbf m_t\\ \text{AdamW:}\quad & \boldsymbol{\theta}_t = \boldsymbol{\theta}_{t-1} - \eta \Big( \frac{\hat{\mathbf{m}}_t}{\sqrt{\hat{\mathbf{v}}_t} + \varepsilon} + \lambda \boldsymbol{\theta}_{t-1} \Big)\end{aligned}$$</div>
+          <p class="small muted">这里 $\beta_1=0.9,\ \beta_2=0.999,\ \varepsilon=10^{-8}$；Adam 即 $\lambda=0$ 的 AdamW。SGD 在峡谷里的步长受最陡方向限制（曲率 4.4 要求 $\eta&lt;2/4.4$），平缓方向只能慢慢挪；Adam 用 $\sqrt{\hat{\mathbf v}_t}$ 把每个坐标的步长都归一到 $\eta$ 量级，近似符号梯度下降。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>峡谷地形（书中 $\mathcal L=0.12\theta_1^2+2.2\theta_2^2$）：SGD 在两侧峭壁之间来回撞墙；把它的 $\eta$ 调过 $0.45$，立刻发散。</li>
+            <li>鞍点地形：起点在脊线附近时梯度几乎为 0，SGD 在鞍点前停留很久，损失曲线出现长长的平台；Adam 把微小梯度放大成正常步长，很快滚下去。勾选梯度噪声也能帮 SGD 逃离。</li>
+            <li>多井地形：默认起点下 SGD、Adam、AdamW 都掉进左上方的浅坑，只有带惯性的 Momentum 冲过山脊落进右侧的全局最低谷。</li>
+            <li>香蕉谷（Rosenbrock）：调大 AdamW 的 $\lambda$，它会停在偏向原点的位置，因为权重衰减与损失梯度在拔河。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 2 ========================= -->
+  <section class="experiment" id="decay" data-title="L2 ≠ 权重衰减">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">2</span>书中手算算例</div>
+        <div id="d-theta"></div>
+        <div id="d-g"></div>
+        <div id="d-lam"></div>
+        <div id="d-eta"></div>
+        <div class="btn-row"><button class="btn ghost" id="d-book">恢复书中数值</button></div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <div class="small" style="font-weight:650;color:var(--navy)">多坐标长程实验</div>
+        <div id="d-scale"></div>
+        <div id="d-lam2"></div>
+        <div id="d-steps"></div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">1</span>第 1 步更新逐行对照<span class="sub">$\beta_1=0.9,\ \beta_2=0.99$，忽略 $\varepsilon$</span></div>
+          <div class="small" style="font-weight:650;color:var(--c3)">AdamW（解耦权重衰减）</div>
+          <div class="formula" id="d-w" style="border-left-color:var(--c3)"></div>
+          <div class="small" style="font-weight:650;color:var(--c4)">Adam + $L_2$ 正则（耦合）</div>
+          <div class="formula" id="d-l2" style="border-left-color:var(--c4)"></div>
+          <div class="caption">偏差修正后 $\hat m_1=g_1$、$\hat v_1=g_1^2$，与 $\beta_1,\beta_2$ 无关，所以第 1 步的自适应项恰好是 $\operatorname{sign}(g_1)$。</div>
+        </div>
+        <div class="stats" id="d-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c5)">∞</span>六个坐标、不同梯度尺度：谁被真正衰减了？<span class="sub">16 对 ±ξ 对偶噪声平均</span></div>
+          <div class="row2">
+            <div class="viz h260" id="d-l2plot"></div>
+            <div class="viz h260" id="d-wplot"></div>
+          </div>
+          <div class="legend" id="d-legend"></div>
+          <div class="caption">每个坐标的损失梯度是纯噪声 $g_t\sim\mathcal N(0,\sigma_i^2)$，真正应该起作用的只有正则项。曲线是 $\mathbb E[\theta_t]$，初值 $\theta_0=1$，$\eta=0.01$。</div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c2)">λ</span>等效衰减率：每步把 $\theta$ 缩小的比例<span class="sub">对数坐标</span></div>
+          <div class="viz h260" id="d-rate"></div>
+          <div class="legend"><span><i style="background:var(--c3)"></i>AdamW 实测</span><span><i style="background:var(--c4)"></i>Adam + $L_2$ 实测</span><span><i style="background:var(--slate);height:2px"></i>理论：$\eta\lambda$ 与 $\eta\lambda/\sigma$</span></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\Delta \boldsymbol{\theta}_{\text{L2}} \propto -\eta \frac{\lambda \boldsymbol{\theta}_{t-1}}{\sqrt{\hat{\mathbf{v}}_t} + \varepsilon} \quad \neq \quad \Delta \boldsymbol{\theta}_{\text{AdamW}} = -\eta \lambda \boldsymbol{\theta}_{t-1}$$</div>
+          <p class="small muted">把 $\lambda\boldsymbol\theta$ 混进梯度，它就会和梯度一起被 $\sqrt{\hat{\mathbf v}_t}$ 除掉：梯度越大的坐标，衰减越弱；梯度极小的坐标，正则项反而主导更新，被以 $\eta$ 的步长匀速拽向 0。AdamW 把 $\lambda\boldsymbol\theta$ 挪到最后单独扣除，对所有坐标一视同仁。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>书中数值下 AdamW 得到 $\theta_1=1.80$，Adam+$L_2$ 得到 $1.90$：第一步 $\hat m_1/\sqrt{\hat v_1}=\operatorname{sign}(\tilde g_1)=1$，正则项被分子分母约得一干二净。</li>
+            <li>把梯度 $g_1$ 拖到 $-10$（损失想把 $\theta$ 往外推）：AdamW 得到 $2.00$，衰减恰好抵消外推；Adam+$L_2$ 得到 $2.10$，与完全不加正则的 Adam 一模一样。</li>
+            <li>看长程实验：AdamW 图里六条线完全重合，都是 $(1-\eta\lambda)^t$；Adam+$L_2$ 图里的线按梯度尺度散开，小梯度坐标被迅速清零，大梯度坐标几乎不衰减。</li>
+            <li>调大“梯度尺度倍率”：Adam+$L_2$ 的曲线整体变平，越来越多坐标的正则形同虚设。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 3 ========================= -->
+  <section class="experiment" id="schedule" data-title="学习率调度设计台">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">3</span>设计你的调度</div>
+        <div class="control"><div class="control-head"><span>高亮</span></div><div id="l-pick"></div></div>
+        <div id="l-T"></div>
+        <div id="l-warm"></div>
+        <div id="l-peak"></div>
+        <div id="l-min"></div>
+        <div id="l-wsd"></div>
+        <div class="caption">在学习率图上点按或拖动，读出任意一步的数值。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c5)">η</span>学习率曲线 $\eta_t$</div>
+          <div class="viz h300" id="l-plot" style="touch-action:none; cursor:crosshair"></div>
+          <div class="legend" id="l-legend"></div>
+        </div>
+        <div class="stats" id="l-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c4)">L</span>同一个带噪二次问题上的训练损失<span class="sub">期望损失的精确递推</span></div>
+          <div class="viz h260" id="l-loss"></div>
+          <div class="caption">玩具问题：五个方向的曲率 $h\in\{1,0.3,0.1,0.03,0.01\}$，梯度噪声方差与曲率成正比。把 $\eta_t$ 按 $3\times10^{-4}\mapsto0.5$ 换算成玩具步长，用 $\mathbb E[\theta_{t+1}^2]=(1-\eta_th)^2\,\mathbb E[\theta_t^2]+\eta_t^2h$ 精确递推。学习率越大噪声地板越高，只有把它降下来，损失才会沉到底。</div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c6)">#</span>调度对照表</div>
+          <div style="overflow-x:auto"><table class="data" id="l-table"></table></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\eta_t = \begin{cases}\eta_{\max} \cdot \dfrac{t}{T_{\text{warmup}}}, & 1 \le t \le T_{\text{warmup}} \\[0.8em] \eta_{\min} + \dfrac{1}{2}(\eta_{\max} - \eta_{\min})\Big(1 + \cos\Big(\dfrac{t - T_{\text{warmup}}}{T_{\max} - T_{\text{warmup}}}\pi\Big)\Big), & T_{\text{warmup}} &lt; t \le T_{\max}\end{cases}$$</div>
+          <p class="small muted">$\tfrac12(1+\cos x)=\cos^2(x/2)$ 在 $x=0$ 和 $x=\pi$ 处导数都为 0，所以余弦段在峰值和终点两端都平滑。WSD（预热-稳定-衰减）把高学习率一直保持到最后一小段再快速降下，便于中途加数据续训；逆平方根是原版 Transformer 的调度，衰减很慢，终点仍偏高。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>比较余弦和 WSD 的损失曲线：WSD 在稳定段一直停在较高的噪声地板上，进入衰减段后损失陡降，最终与余弦相差无几。</li>
+            <li>把 $\eta_{\min}/\eta_{\max}$ 从 0.1 拉到 0：余弦终点更低，玩具损失也更低；拉到 0.5 则噪声地板明显抬高。</li>
+            <li>把峰值 $\eta_{\max}$ 推过 $1.2\times10^{-3}$：玩具步长超过 $2/h_{\max}=2$，最陡的方向开始发散，损失曲线向上冲。</li>
+            <li>看对照表的“平均学习率”：常数调度走得最远，却因为噪声停在最高的损失上。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

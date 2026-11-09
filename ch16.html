@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 16 章 · 在线实验室</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="assets/lab.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="assets/lab.js"></script>
+<script defer src="ch16.js"></script>
+<style>.rw { border:1px solid var(--line); border-radius:10px; padding:6px 8px; min-width:46px; text-align:center; cursor:pointer; background:#fff; font:inherit; font-size:13px; } .rw.ok { background:var(--c3l); border-color:var(--leaf); color:var(--leaf); } .rw.bad { background:var(--c4l); border-color:var(--coral); color:var(--coral); } table.data tr.pick td { background:var(--c2l); } table.data th { white-space:nowrap; }</style>
+</head>
+<body data-chapter="16">
+<main class="container">
+
+  <!-- ========================= 实验 1 ========================= -->
+  <section class="experiment" id="passk" data-title="Pass@k 无偏估计">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">1</span>抽 $k$ 次至少对一次</div>
+        <div class="explain small">对同一道题采样 $n$ 次，其中 $c$ 次答对。想知道“只抽 $k$ 次时至少答对一次”的概率。</div>
+        <div id="pk-n"></div>
+        <div id="pk-c"></div>
+        <div id="pk-k"></div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <div id="pk-p"></div>
+        <div class="caption">下图假设单次真实正确率为 $p$，对 $c\sim\operatorname{Binomial}(n,p)$ 精确求期望，比较两种估计量的偏差。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">k</span>由这 $n$ 次采样估计的 Pass@$k$</div>
+          <div class="viz h300" id="pk-curve"></div>
+          <div class="legend">
+            <span><i style="background:var(--c1)"></i>无偏估计 $1-\binom{n-c}{k}/\binom{n}{k}$</span>
+            <span><i style="background:var(--c2)"></i>直接代入 $1-(1-c/n)^k$</span>
+          </div>
+        </div>
+        <div class="stats" id="pk-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c3)">𝔼</span>哪个估计量是无偏的？<span class="sub">对 $c$ 的二项分布精确求和</span></div>
+          <div class="viz h260" id="pk-bias"></div>
+          <div class="legend">
+            <span><i style="background:var(--c3)"></i>真值 $1-(1-p)^k$</span>
+            <span><i style="background:var(--c1)"></i>$\mathbb E[\text{无偏估计}]$</span>
+            <span><i style="background:var(--c2)"></i>$\mathbb E[\text{直接代入}]$</span>
+          </div>
+          <div class="caption" id="pk-bias-cap"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\operatorname{Pass@}k = 1 - \frac{\binom{n - c}{k}}{\binom{n}{k}} = 1-\prod_{i=n-c+1}^{n}\Big(1-\frac{k}{i}\Big)\ \approx\ 1 - (1 - p_{\text{pass}})^k$$</div>
+          <p class="small muted">从 $n$ 个样本中不放回地任取 $k$ 个，全部取到错误样本的概率是 $\binom{n-c}{k}/\binom{n}{k}$（超几何分布）。对随机的 $c$ 求期望，它恰好等于 $(1-p)^k$，所以是无偏的。直接把 $\hat p=c/n$ 代入 $1-(1-\hat p)^k$ 时，由于这个函数是凹的，琴生不等式让它系统性地低估。中间的连乘形式数值稳定，是 Codex 论文推荐的写法。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>书中例子：把 $p$ 设为 0.10，在下图读 $k=30$ 处的真值，应为 $1-0.9^{30}\approx95.8\%$。</li>
+            <li>把 $k$ 拉到 $n-c+1$ 以上：无偏估计变成 100%，因为任取 $k$ 个必然含有一个正确样本；直接代入却永远到不了 100%。</li>
+            <li>把 $n$ 调小到 10 左右：下图中橙色曲线明显低于真值，这就是小样本偏差；蓝色曲线始终与真值重合。</li>
+            <li>令 $c=0$：两种估计都给出 0，哪怕真实 $p$ 并不为 0。采样数 $n$ 太少时，Pass@$k$ 本身也不可靠。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 2 ========================= -->
+  <section class="experiment" id="bestofn" data-title="Best-of-N 与多数投票">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">2</span>并行扩展：多抽几个</div>
+        <div id="bn-n"></div>
+        <div class="small muted">验证器打分的分布：</div>
+        <div id="bn-dist" style="margin:6px 0 4px"></div>
+        <div class="btn-row"><button class="btn ghost" id="bn-mc">蒙特卡洛验证</button></div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <div class="small muted">多数投票（自洽性）：</div>
+        <div id="mv-p"></div>
+        <div id="mv-d"></div>
+        <div id="mv-rho"></div>
+      </div>
+      <div class="stack">
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c1)">↑</span>选最高分：期望奖励</div>
+            <div class="viz h260" id="bn-reward"></div>
+            <div class="legend">
+              <span><i style="background:var(--c1)"></i>$\mathbb E[\max_{i\le N} r_i]$</span>
+              <span><i style="background:var(--slate);opacity:.5"></i>增长参照</span>
+              <span><i style="background:var(--c2)"></i>蒙特卡洛</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c4)">KL</span>代价：偏离原策略多远</div>
+            <div class="viz h260" id="bn-kl"></div>
+            <div class="legend">
+              <span><i style="background:var(--c4)"></i>$D_{\text{KL}}(\pi_{\text{BoN}}\,\|\,\pi)=\ln N-\frac{N-1}{N}$</span>
+            </div>
+          </div>
+        </div>
+        <div class="stats" id="bn-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c3)">✓</span>多数投票的准确率<span class="sub">每个 $N$ 模拟 2000 次</span></div>
+          <div class="viz h300" id="mv-plot"></div>
+          <div class="legend">
+            <span><i style="background:var(--c3)"></i>多数投票 maj@$N$</span>
+            <span><i style="background:var(--c1)"></i>完美验证器 pass@$N=1-(1-p)^N$</span>
+            <span><i style="background:var(--c4)"></i>单次正确率 $p$ 与最强干扰项</span>
+          </div>
+          <div class="caption" id="mv-cap"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$P_{\boldsymbol{\theta}}(y \mid x) = \sum_{\mathbf{z}} P_{\boldsymbol{\theta}}(y \mid \mathbf{z}, x)\, P_{\boldsymbol{\theta}}(\mathbf{z} \mid x)\ \approx\ \frac1N\sum_{i=1}^{N}\mathbf 1\big[y^{(i)}=y\big],\qquad \mathbf z^{(i)}\sim P_{\boldsymbol\theta}(\mathbf z\mid x)$$</div>
+          <div class="formula">$$\mathbb E\big[\max_{i\le N} r_i\big]=\int r\, N f(r)F(r)^{N-1}\,dr$$</div>
+          <div class="formula">$$\text{指数分布：}\ \mathbb E=\sum_{i=1}^N\frac1i\approx\ln N+0.577,\qquad \text{高斯：}\ \mathbb E\approx\sqrt{2\ln N}$$</div>
+          <p class="small muted">多数投票是对思维链边际概率的蒙特卡洛估计：抽 $N$ 条推理路径，取出现最多的答案。只要正确答案是众数（$p$ 大于任何一个错误答案的概率），$N\to\infty$ 时准确率趋于 1；反之趋于 0。Best-of-$N$ 的收益只按 $\sqrt{\ln N}$ 或 $\ln N$ 增长，而偏离原策略的 KL 代价按 $\ln N$ 增长，测试时计算的回报是递减的。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>把 $N$ 从 1 加到 256：高斯奖励的期望最大值只从 0 涨到约 2.8，翻倍采样换来的收益越来越少。</li>
+            <li>多数投票：$p=0.4$、三个干扰项平分其余概率时，正确答案是众数，maj@$N$ 随 $N$ 上升。</li>
+            <li>把“最强干扰项占比”拉到 0.8：最强错误答案的概率超过 0.4，投票越多错得越坚定。</li>
+            <li>对比蓝色虚线：有完美验证器时只要有一次答对就行，上限远高于投票，这就是验证器的价值。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 3 ========================= -->
+  <section class="experiment" id="search" data-title="PUCT 树搜索与 GRPO">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">3</span>在推理树上边走边学</div>
+        <div class="explain small">题目：<b>一个数的 3 倍加 5 等于 20，这个数是几？</b>模型先选第一步思路，再写出答案。叶子上的数字是该路径真实的答对概率，搜索时只能通过抽样奖励（答对得 1 分）间接得知。</div>
+        <div id="ts-c"></div>
+        <div class="btn-row">
+          <button class="btn" id="ts-one">模拟 1 次</button>
+          <button class="btn teal" id="ts-auto">▶ 自动模拟</button>
+          <button class="btn ghost" id="ts-reset">重置</button>
+        </div>
+        <div class="caption">每次模拟：从根节点出发，每层按 PUCT 得分选分支，到叶子后抽一次奖励，再把结果回传给路径上的每个节点。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--navy)">🌲</span>推理树<span class="sub">线宽 = 访问次数　琥珀色 = 上一次的路径</span></div>
+          <div class="viz h340" id="ts-tree"></div>
+          <div id="ts-legend" class="small muted" style="margin-top:6px"></div>
+        </div>
+        <div class="stats" id="ts-stats"></div>
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c2)">U</span>根节点：下一次选谁？</div>
+            <div id="ts-table" class="small"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--amber)">✍</span>书中手算：老路还是新路</div>
+            <div id="ts-book" class="small"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c5)">G</span>GRPO：组内相对优势</div>
+          <div class="small muted">点击每个回答切换对错（规则奖励 1 或 0），或选一个预设：</div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0">
+            <div id="gr-preset"></div>
+            <div id="gr-g" style="flex:1;min-width:180px"></div>
+          </div>
+          <div id="gr-chips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+          <div class="viz h260" id="gr-bars" style="margin-top:10px"></div>
+          <div class="caption" id="gr-cap"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\operatorname{PUCT}(s, a) = Q(s, a) + c_{\text{puct}}\, P_{\boldsymbol{\theta}}(a \mid s)\, \frac{\sqrt{\sum_b N(s, b)}}{1 + N(s, a)},\qquad \hat{A}_i^{\text{GRPO}} = \frac{r_i - \operatorname{mean}(\mathbf{r})}{\operatorname{std}(\mathbf{r}) + \varepsilon}$$</div>
+          <p class="small muted">$Q$ 是历史平均奖励（利用），第二项是探索奖励：先验 $P$ 高、被访问得少的分支加分多。$c_{\text{puct}}$ 越大越爱探索，$c=0$ 时只看历史成绩，容易被开局的运气锁死。GRPO 用同一组回答的平均分当基线，组内优势之和恒为 0，省掉了价值网络；整组全对或全错时标准差为 0，这道题不提供任何学习信号。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>先验最偏爱思路 B（0.45），但它最容易算错。连续模拟 100 次，访问次数会逐渐转向真正靠谱的思路 A。</li>
+            <li>把 $c$ 调到 0 再重置并模拟：搜索只看 $Q$，第一次得分高的分支会被反复选中，可能永远发现不了更好的路。</li>
+            <li>书中手算：$c=1$ 时新路得分 1.50、老路 0.90，选新路。把 $c$ 降到 0.25 以下，结论翻转。</li>
+            <li>GRPO：书中 $\mathbf r=(1,1,0,0)$ 给出 $\pm1$ 的对称优势。改成只有 1 个答对，它的优势变成 $+\sqrt3\approx1.73$，物以稀为贵。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

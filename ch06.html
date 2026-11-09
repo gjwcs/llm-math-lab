@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 6 章 · 在线实验室</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="assets/lab.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="assets/lab.js"></script>
+<script defer src="ch06.js"></script>
+</head>
+<body data-chapter="6">
+<main class="container">
+
+  <!-- ========================= 实验 1 ========================= -->
+  <section class="experiment" id="rotation" data-title="复平面上的旋转">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">1</span>参数控制台</div>
+        <p class="small">位置 $m$ 的查询 $\mathbf q$ 转 $m\theta$，位置 $n$ 的键 $\mathbf k$ 转 $n\theta$。<b>拖动箭头端点</b>可以改变 $\mathbf q,\mathbf k$ 本身。</p>
+        <div id="r-m"></div>
+        <div id="r-n"></div>
+        <div id="r-theta"></div>
+        <div id="r-lock"></div>
+        <div class="btn-row">
+          <button class="btn teal" id="r-play">▶ 整句一起后移</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn ghost" id="r-bookA">书中场景 A</button>
+          <button class="btn ghost" id="r-bookB">场景 B（后移 10）</button>
+        </div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">i</span>复平面<span class="sub">虚线 = 旋转前 · 实线 = 旋转后</span></div>
+          <div class="viz h380" id="r-plane"></div>
+        </div>
+        <div class="stats" id="r-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c2)">Δ</span>旋转后的内积只取决于相对距离 $n-m$</div>
+          <div class="viz h260" id="r-curve"></div>
+          <div class="caption">曲线是 $\mathbf q^\top\mathbf R_{(n-m)\theta}\mathbf k$，红点是当前的 $(m,n)$。无论 $m,n$ 怎么一起变，只要差值不变，红点就钉在原地。</div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\tilde{\mathbf{q}}_m = \mathbf{R}_{m\theta} \mathbf{q} = \begin{bmatrix} \cos(m\theta) & -\sin(m\theta) \\ \sin(m\theta) & \cos(m\theta) \end{bmatrix} \begin{bmatrix} q_1 \\ q_2 \end{bmatrix}, \qquad \langle \tilde{\mathbf{q}}_m, \tilde{\mathbf{k}}_n \rangle = \mathbf{q}^\top \mathbf{R}_{m\theta}^\top \mathbf{R}_{n\theta} \mathbf{k} = \mathbf{q}^\top \mathbf{R}_{(n-m)\theta} \mathbf{k}$$</div>
+          <div class="explain">编码时每个词只和自己的绝对位置打交道（兼容 KV Cache）；相遇做内积时，$\mathbf R_{m\theta}^\top\mathbf R_{n\theta}=\mathbf R_{(n-m)\theta}$ 让绝对位置自动抵消，只留下相对距离。旋转是正交变换，模长一分不变。</div>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>点“书中场景 A”：$\mathbf q=(1,0)$、$\mathbf k=(0,1)$、$\theta=30^\circ$、$m=1,n=4$，内积是 $-1$。再点“场景 B”：两个向量都转到了别处，内积仍是 $-1$。</li>
+            <li>勾选“锁定相对距离”后拖动 $m$，或者按“整句一起后移”：两根指针一起转圈，夹角和内积纹丝不动。</li>
+            <li>取消锁定只拖 $n$：红点沿曲线滑动，内积按 $\cos$ 周期性变化，周期是 $360^\circ/\theta$。</li>
+            <li>把 $\mathbf q$ 拖长一倍：所有内积都翻倍，但“只依赖 $n-m$”这件事不受影响。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 2 ========================= -->
+  <section class="experiment" id="decay" data-title="多频叠加与远程衰减">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">2</span>参数控制台</div>
+        <p class="small">把 $d$ 维向量两两配对成 $d/2$ 根“指针”，第 $j$ 根的角速度 $\theta_j=\text{base}^{-2(j-1)/d}$：第 1 根是秒针，最后一根是时针。</p>
+        <div id="d-d"></div>
+        <div id="d-base"></div>
+        <div id="d-delta"></div>
+        <div class="btn-row">
+          <button class="btn ghost" id="d-b1">base = 10⁴</button>
+          <button class="btn ghost" id="d-b2">5×10⁵（LLaMA-3）</button>
+          <button class="btn ghost" id="d-b3">10⁶</button>
+        </div>
+      </div>
+      <div class="stack">
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c1)">S</span>相位叠加 $S_j(\Delta)=\sum_{k\le j}e^{i\Delta\theta_k}$</div>
+            <div class="viz h300" id="d-spiral"></div>
+            <div class="caption">$d/2$ 个单位向量首尾相接。$\Delta=0$ 时排成一条直线；距离越远，快指针转得七零八落，互相抵消。</div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c6)">θ</span>各维的角速度与波长</div>
+            <div class="viz h300" id="d-spec"></div>
+            <div class="legend"><span><i style="background:var(--c6)"></i>角速度 $\theta_j$（弧度/词）</span><span><i style="background:var(--c2)"></i>波长 $2\pi/\theta_j$（词）</span></div>
+          </div>
+        </div>
+        <div class="stats" id="d-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c4)">B</span>远程衰减：内积上界随相对距离 $\Delta=|m-n|$ 的变化</div>
+          <div class="viz h300" id="d-curve"></div>
+          <div class="legend"><span><i style="background:var(--c4)"></i>Abel 上界 $B(\Delta)/B(0)$</span><span><i style="background:var(--c1)"></i>$|S_{d/2}(\Delta)|/(d/2)$</span><span><i style="background:var(--c3)"></i>$\frac{2}{d}\sum_j\cos(\Delta\theta_j)$（$\mathbf q=\mathbf k$ 全 1 时的内积）</span></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\operatorname{Re}\!\left[\sum_{i=1}^{d/2} q_{[i]} k_{[i]}^* \, e^{i (m-n)\theta_i}\right] \le \left( \max_{1 \le i \le d/2} |h_{i+1} - h_i| \right) \cdot \underbrace{\frac{1}{d/2}\sum_{j=1}^{d/2} \left| \sum_{k=1}^{j} e^{i (m-n)\theta_k} \right|}_{B(|m-n|)}$$</div>
+          <div class="explain">Abel 分部求和把“内容”$|h_{i+1}-h_i|$ 和“位置”$B(\Delta)$ 拆开。$\Delta=0$ 时所有单位向量同向，$|S_j|=j$，上界最大；$\Delta$ 很大时快慢不一的指针指向四面八方，部分和缩水。这天然符合“离得越远关联越弱”的语言先验。</div>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>拖动 $\Delta$ 从 0 到 100：左上的直线先弯成弧，再卷成一团，红色上界随之下降。</li>
+            <li>把 base 从 $10^4$ 换成 $10^6$：所有指针变慢，衰减曲线整体右移，更远的词也能保持关联，这就是长上下文模型调大 base 的原因。</li>
+            <li>看右上图：$d=128$、base $=10^4$ 时最慢的维度波长约 $5.4\times10^4$ 个词，训练长度 4K 时它连一圈都转不完。</li>
+            <li>把 $d$ 调小到 16：指针太少，抵消不充分，衰减曲线起伏很大。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 3 ========================= -->
+  <section class="experiment" id="extrapolation" data-title="长度外推：PI、NTK 与 ALiBi">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">3</span>参数控制台</div>
+        <p class="small">模型只在长度 $L_{\text{train}}$ 内训练过，现在要读 $L_{\text{test}}=s\cdot L_{\text{train}}$ 的长文。</p>
+        <div class="small muted">训练长度 $L_{\text{train}}$：</div>
+        <div id="e-L" style="margin:6px 0 4px"></div>
+        <div id="e-s"></div>
+        <div id="e-d"></div>
+        <div id="e-base"></div>
+        <div id="e-i"></div>
+        <div id="e-H"></div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c2)">◷</span>第 $i$ 组维度的“表盘”<span class="sub" id="e-sub"></span></div>
+          <div class="viz h260" id="e-dials"></div>
+          <div class="legend"><span><i style="background:#C9D1DA"></i>训练时见过的角度</span><span><i style="background:var(--c3)"></i>测试时用到、且见过</span><span><i style="background:var(--c4)"></i>测试时用到、从未见过</span></div>
+        </div>
+        <div class="stats" id="e-stats"></div>
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c6)">λ</span>各维波长 $2\pi/\theta_i$ 与上下文长度</div>
+            <div class="viz h260" id="e-wave"></div>
+            <div class="legend"><span><i style="background:var(--c1)"></i>原始</span><span><i style="background:var(--c2)"></i>PI</span><span><i style="background:var(--c3)"></i>NTK-aware</span></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c5)">A</span>ALiBi：每个头的距离惩罚 $e^{-\lambda_h\Delta}$</div>
+            <div class="viz h260" id="e-alibi"></div>
+            <div class="caption">斜率 $\lambda_h=2^{-8h/H}$。没有旋转就没有“没见过的角度”，代价是远处的词被指数压低。</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c3)">≡</span>四种方案对比（按当前参数实时计算）</div>
+          <div style="overflow-x:auto"><table class="data" id="e-table"></table></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\theta_i^{\text{PI}} = \frac{\theta_i}{s}, \qquad \theta_i^{\text{NTK}} = (s \cdot \text{base})^{-2(i-1)/d_k} = \theta_i \cdot s^{-2(i-1)/d_k}, \qquad \operatorname{Attention}_{\text{ALiBi}}(\mathbf{q}_m, \mathbf{k}_n) = \frac{\mathbf{q}_m^\top \mathbf{k}_n}{\sqrt{d_k}} - \lambda_h \cdot |m - n|$$</div>
+          <div class="explain">直接外推会让“时针”转进训练时从未见过的扇区。PI 把所有位置除以 $s$，时针不越界了，但秒针也慢了 $s$ 倍，相邻词变模糊。NTK-aware 的指数 $s^{-2(i-1)/d_k}$ 让秒针（$i=1$）分毫不减、时针（$i=d_k/2$）放慢约 $s$ 倍。ALiBi 干脆不用旋转，直接按距离线性扣分。</div>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>默认 $i=64$（最慢的时针）：原始 RoPE 在训练时只转了约 $27^\circ$，测试时要转到 $217^\circ$，大片红色扇区从未见过。</li>
+            <li>看 PI 的表盘：红色消失了，但表格里它的“相邻词角差”只剩原来的 $1/s$。</li>
+            <li>把 $i$ 拖到 50 附近：NTK-aware 在中间频段仍有不小的红色扇区，这正是 YaRN 对不同频段分段处理的动机。</li>
+            <li>把 $s$ 调到 1：四种方案完全一致，没有任何外推压力。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

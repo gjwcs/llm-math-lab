@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 1 章 · 在线实验室</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="assets/lab.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="assets/lab.js"></script>
+<script defer src="ch01.js"></script>
+</head>
+<body data-chapter="1">
+<main class="container">
+
+  <!-- ========================= 实验 1 ========================= -->
+  <section class="experiment" id="next-token" data-title="下一个词的概率与罚单">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">1</span>参数控制台</div>
+        <div class="explain kai">“因为今天一直在下暴雨，地面非常湿滑，所以李明出门时特意带了<b>＿＿</b>。”</div>
+        <div class="small muted">拖动每个候选词的原始打分（Logit）：</div>
+        <div id="logit-sliders"></div>
+        <div id="tau-slider"></div>
+        <div id="eps-slider"></div>
+        <div class="small muted" style="margin-top:6px">人类真正写下的词（真实答案 $w_t^*$）：</div>
+        <div class="pill-row" id="truth-pills" style="margin-top:6px"></div>
+        <div class="btn-row">
+          <button class="btn ghost" id="btn-uniform">全部均匀（最困惑）</button>
+          <button class="btn ghost" id="btn-sharp">押中正确答案</button>
+        </div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">P</span>Softmax 输出的预测分布 $Q_\theta(w_t\mid w_{&lt;t})$<span class="sub">绿色 = 真实答案</span></div>
+          <div class="viz h300" id="bars"></div>
+        </div>
+        <div class="stats" id="stats1"></div>
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--coral)">L</span>交叉熵罚单 $-\ln Q(w_t^*)$</div>
+            <div class="viz h260" id="ce-curve"></div>
+            <div class="caption">红点是当前模型给真实答案押的概率。越靠左，罚金和梯度越大。</div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+            <div class="formula">$$\mathcal{L}_{\text{CE}} = -\sum_{w\in\mathcal V} P(w\mid w_{&lt;t})\,\ln Q_\theta(w\mid w_{&lt;t})$$</div>
+            <div class="formula">$$H(Q)=-\sum_w Q(w)\ln Q(w),\qquad \operatorname{PPL}=e^{H}$$</div>
+            <div class="formula">$$D_{\text{KL}}(P\,\|\,Q)=\mathcal{L}_{\text{CE}}-H(P)$$</div>
+            <p class="small muted">标签平滑 $\varepsilon&gt;0$ 时，真实分布 $P$ 不再是独热向量：正确词得 $1-\varepsilon$，其余词均分 $\varepsilon$。此时 $H(P)&gt;0$，交叉熵与 KL 散度不再相等。</p>
+          </div>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>把真实答案设为“雨伞”，再把“雨伞”的 Logit 拉到最低：罚单 $-\ln Q$ 会爆炸到多少？</li>
+            <li>点“全部均匀”：困惑度恰好等于候选词个数 6，这就是“六选一”的含义。</li>
+            <li>把温度 $\tau$ 调到 0.2 再调到 5：分布从“尖峰”变成“平原”，熵和困惑度如何变化？</li>
+            <li>打开标签平滑 $\varepsilon=0.1$：为什么即便模型完美押中，交叉熵也降不到 0？</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 2 ========================= -->
+  <section class="experiment" id="shannon" data-title="香农的猜字母赌局">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">2</span>游戏规则</div>
+        <p class="small">像 1950 年的贝蒂一样，看着露出的前缀，猜<b>下一个字符</b>（字母或空格）。猜中记下你用了几次。全部猜完后，我们用“需要几次才猜中”的频率估计英文的熵。</p>
+        <div class="control"><div class="control-head"><span>选择文本</span></div>
+          <select id="text-choice"></select></div>
+        <div class="seg-host" id="mode-seg" style="margin:8px 0"></div>
+        <div class="btn-row">
+          <button class="btn teal" id="btn-auto">让电脑按频率猜（自动演示）</button>
+          <button class="btn ghost" id="btn-reset">重新开始</button>
+        </div>
+        <div class="caption">提示：电脑用的是在一段英文语料上统计出的“前两个字符 → 下一个字符”频率表（三元模型）。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--amber)">Aa</span>前缀与你的猜测</div>
+          <div id="sh-text" class="mono" style="font-size:17px; line-height:2.1; letter-spacing:.06em; word-break:break-all"></div>
+          <div style="display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap">
+            <input id="sh-input" type="text" maxlength="1" placeholder="输入一个字母或空格" style="width:190px; font-size:16px" autocomplete="off" autocapitalize="characters">
+            <span id="sh-feedback" class="small muted"></span>
+          </div>
+          <div id="sh-tried" class="small muted" style="margin-top:6px"></div>
+        </div>
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c3)">#</span>“猜中所需次数”分布</div>
+            <div class="viz h260" id="sh-hist"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c5)">H</span>熵的估计</div>
+            <div class="stats" id="sh-stats"></div>
+            <p class="small muted" style="margin-top:10px">若第 $i$ 次才猜中的频率为 $q_i$，香农证明英文的熵上界约为 $-\sum_i q_i\log_2 q_i$ 比特/字符。完全随机的 27 个符号是 $\log_2 27\approx 4.75$ 比特；香农用真人实验得到约 1 比特，这就是“前文对下一个字施加了极强概率约束”的含义。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 3 ========================= -->
+  <section class="experiment" id="chain" data-title="链式法则与数值下溢">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">3</span>“我 / 爱 / 数学”</div>
+        <div id="chain-sliders"></div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+        <div id="len-slider"></div>
+        <div id="pstep-slider"></div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">∏</span>一句话的概率 = 每一步接龙概率的连乘</div>
+          <div class="formula" id="chain-formula"></div>
+          <div class="stats" id="chain-stats"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--coral)">0</span>为什么工程上绝不直接连乘？<span class="sub">float64 实测</span></div>
+          <div class="viz h300" id="underflow"></div>
+          <div class="legend"><span><i style="background:var(--c4)"></i>直接连乘 $\prod_t p$（$\log_{10}$ 刻度，小于约 $10^{-324}$ 后变成 0）</span><span><i style="background:var(--c3)"></i>先取对数再求和 $\sum_t \ln p$（永远稳定）</span></div>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>把三步概率都调成 0.25：平均交叉熵 $\ln 4\approx1.386$，困惑度恰好是 4，正对应“四选一”的随机模型。</li>
+            <li>把句长 $T$ 拉到 1000 以上：直接连乘的结果在哪一步彻底变成 0？</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

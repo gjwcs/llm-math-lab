@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 13 章 · 在线实验室</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="assets/lab.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="assets/lab.js"></script>
+<script defer src="ch13.js"></script>
+</head>
+<body data-chapter="13">
+<main class="container">
+
+  <!-- ========================= 实验 1 ========================= -->
+  <section class="experiment" id="forward" data-title="前向加噪的一步跃迁">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">1</span>把雕像砸成石块</div>
+        <div class="small muted">数据形状：</div>
+        <div id="f-shape" style="margin:6px 0 8px"></div>
+        <div class="small muted">噪声调度 $\beta_t$：</div>
+        <div id="f-sched" style="margin:6px 0 4px"></div>
+        <div id="f-t"></div>
+        <div class="btn-row">
+          <button class="btn teal" id="f-play">▶ 播放 $t: 0\to1000$</button>
+          <button class="btn ghost" id="f-reseed">换一批噪声 $\boldsymbol\epsilon$</button>
+        </div>
+        <div class="caption">每个点各自抽一个固定的 $\boldsymbol\epsilon\sim\mathcal N(\mathbf 0,\mathbf I)$，拖动 $t$ 时直接用一步公式算 $\mathbf x_t$，不需要循环 $t$ 次。颜色标记每个点在原形状上的位置。</div>
+      </div>
+      <div class="stack">
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c5)">x</span>加噪后的点云 $\mathbf x_t$</div>
+            <div class="viz sq" id="f-cloud"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c1)">ᾱ</span>信号与噪声的系数</div>
+            <div class="viz sq" id="f-curve"></div>
+            <div class="legend">
+              <span><i style="background:var(--c1)"></i>$\sqrt{\bar\alpha_t}$（信号）</span>
+              <span><i style="background:var(--c4)"></i>$\sqrt{1-\bar\alpha_t}$（噪声）</span>
+              <span>虚线：另一种调度</span>
+            </div>
+          </div>
+        </div>
+        <div class="stats" id="f-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--amber)">✍</span>书中手算：两步加噪 = 一步跃迁<span class="sub">各模拟 20000 次</span></div>
+          <div class="viz h260" id="f-two"></div>
+          <div class="legend">
+            <span><i style="background:var(--c2)"></i>两步走：$x_1 = 0.9x_0+\sqrt{0.19}\,\epsilon_1$，$x_2=\frac89 x_1+\frac{\sqrt{17}}{9}\epsilon_2$</span>
+            <span><i style="background:var(--c6)"></i>一步跳：$x_2=0.8x_0+0.6\,\epsilon$</span>
+            <span><i style="background:var(--navy)"></i>理论 $\mathcal N(8,\,0.6^2)$</span>
+          </div>
+          <div class="caption" id="f-two-cap"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\mathbf{x}_t = \sqrt{\bar{\alpha}_t}\,\mathbf{x}_0 + \sqrt{1 - \bar{\alpha}_t}\,\boldsymbol{\epsilon}, \qquad \boldsymbol{\epsilon} \sim \mathcal{N}(\mathbf{0}, \mathbf{I}), \quad \bar{\alpha}_t = \prod_{s=1}^{t} (1 - \beta_s)$$</div>
+          <p class="small muted">两个系数的平方和恒为 1，所以加噪是一次“保持总方差的旋转”：令 $\cos\phi_t=\sqrt{\bar\alpha_t}$，则 $\mathbf x_t=\cos\phi_t\,\mathbf x_0+\sin\phi_t\,\boldsymbol\epsilon$。线性调度取 $\beta_t$ 从 $10^{-4}$ 均匀增到 $0.02$；余弦调度（Nichol 与 Dhariwal）直接规定 $\bar\alpha_t=\cos^2\!\big(\frac{t/T+s}{1+s}\cdot\frac\pi2\big)/\cos^2\!\big(\frac{s}{1+s}\cdot\frac\pi2\big)$，$s=0.008$，信号消失得更均匀。</p>
+          <p class="small muted">两步合并时，两个独立高斯噪声的方差相加：$\alpha_2(1-\alpha_1)+(1-\alpha_2)=1-\bar\alpha_2$。书中取 $\bar\alpha_2=0.64$，恰好凑成勾股数 $0.8^2+0.6^2=1$。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>把 $t$ 拖到 300 左右：线性调度下月牙已经糊成一团，换成余弦调度再看，形状还清晰得多。</li>
+            <li>看右图两条曲线的交点：$\bar\alpha_t=0.5$ 时信号和噪声各占一半，两种调度的交点分别在哪个 $t$？</li>
+            <li>点“播放”：$t=1000$ 时点云已经是标准正态的圆形团，原来的颜色完全打乱。</li>
+            <li>看下方直方图：两步走和一步跳的均值都是 8.0、标准差都是 0.6，分布完全重合。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 2 ========================= -->
+  <section class="experiment" id="reverse" data-title="得分场与反向去噪">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">2</span>顺着得分场把沙子刷掉</div>
+        <div class="small muted">数据形状（每个形状都是许多小高斯的混合，所以得分可以精确计算）：</div>
+        <div id="r-shape" style="margin:6px 0 8px"></div>
+        <div class="small muted">采样器：</div>
+        <div id="r-sampler" style="margin:6px 0 4px"></div>
+        <div id="r-steps"></div>
+        <div id="r-t"></div>
+        <div id="r-opts"></div>
+        <div class="btn-row">
+          <button class="btn teal" id="r-run">▶ 从纯噪声开始去噪</button>
+          <button class="btn ghost" id="r-clear">清空粒子</button>
+        </div>
+        <div class="caption">不运行时，拖动 $t$ 可以查看任意时刻的得分场；拖动图中的红色探针，看它的得分方向和 Tweedie 去噪估计。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--navy)">∇</span>得分场 $\nabla_{\mathbf x}\ln q_t(\mathbf x)$ 与采样粒子<span class="sub" id="r-sub"></span></div>
+          <div class="viz" id="r-field" style="height:clamp(320px, 96vw, 480px)"></div>
+          <div class="legend">
+            <span><i style="background:var(--navy2)"></i>箭头：得分方向（长度按噪声尺度 $s_t$ 归一化）</span>
+            <span><i style="background:var(--c4)"></i>探针与 Tweedie 估计 $\hat{\mathbf x}_0$（空心圈）</span>
+            <span><i style="background:var(--navy)"></i>采样粒子</span>
+          </div>
+        </div>
+        <div class="stats" id="r-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\nabla_{\mathbf{x}_t} \ln q(\mathbf{x}_t) = -\frac{\boldsymbol{\epsilon}_{\boldsymbol{\theta}^*}(\mathbf{x}_t, t)}{\sqrt{1 - \bar{\alpha}_t}},\qquad \hat{\mathbf x}_0=\mathbb E[\mathbf x_0\mid\mathbf x_t]=\frac{\mathbf x_t+(1-\bar\alpha_t)\nabla\ln q(\mathbf x_t)}{\sqrt{\bar\alpha_t}}$$</div>
+          <div class="formula">$$\text{DDPM：}\ \mathbf x_{t-1}=\frac{1}{\sqrt{\alpha_t}}\Big(\mathbf x_t+\beta_t\nabla\ln q(\mathbf x_t)\Big)+\sqrt{\tilde\beta_t}\,\mathbf z,\qquad \text{朗之万：}\ \mathbf x\leftarrow\mathbf x+\tfrac{\eta}{2}\nabla\ln q_t(\mathbf x)+\sqrt{\eta}\,\mathbf z$$</div>
+          <p class="small muted">这里的数据分布是 $K$ 个小高斯 $\mathcal N(\boldsymbol\mu_k,\sigma_0^2\mathbf I)$ 的等权混合，加噪后仍是混合高斯：$q_t=\frac1K\sum_k\mathcal N\big(\sqrt{\bar\alpha_t}\boldsymbol\mu_k,\,s_t^2\mathbf I\big)$，$s_t^2=\bar\alpha_t\sigma_0^2+1-\bar\alpha_t$。于是得分有闭式解 $\nabla\ln q_t(\mathbf x)=-\big(\mathbf x-\sqrt{\bar\alpha_t}\,\mathbb E[\boldsymbol\mu_k\mid\mathbf x]\big)/s_t^2$，相当于一个训练到完美的去噪网络 $\boldsymbol\epsilon_{\boldsymbol\theta^*}$。DDIM 是同一个得分场驱动的确定性版本：先用 Tweedie 公式估出 $\hat{\mathbf x}_0$，再用一步公式跳到更小的 $t$。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>把 $t$ 从 1000 慢慢拖到 0：大 $t$ 时箭头整齐地指向原点（像一个大高斯），小 $t$ 时箭头才“认出”月牙的细节。</li>
+            <li>把探针拖到两个月牙之间：Tweedie 估计 $\hat{\mathbf x}_0$ 落在两者之间的“平均位置”，这正是条件期望。</li>
+            <li>用 DDPM、1000 步运行一次，再把步数降到 10：粒子还能回到形状上吗？</li>
+            <li>换成“螺旋”，分别试 DDPM、DDIM 和朗之万：三种采样器用的是同一个得分场。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 3 ========================= -->
+  <section class="experiment" id="flow" data-title="流匹配与 CFG 引导">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">3</span>走直线，再加一点引导</div>
+        <div id="fm-steps"></div>
+        <div id="fm-opts"></div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+        <div class="small muted">无分类器引导：想要哪一类？</div>
+        <div id="cfg-cls" style="margin:6px 0 4px"></div>
+        <div id="cfg-w"></div>
+        <div class="btn-row">
+          <button class="btn ghost" id="fm-reseed">换一批起点噪声</button>
+        </div>
+        <div class="caption">两个月牙各是一类（$c=$ 上 / 下）。所有速度场与得分场都由混合高斯精确算出，两种方法都用最朴素的欧拉法、同样的起点噪声。</div>
+      </div>
+      <div class="stack">
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c4)">~</span>扩散：概率流 ODE</div>
+            <div class="viz sq" id="fm-diff"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c3)">—</span>流匹配：直线插值</div>
+            <div class="viz sq" id="fm-flow"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--navy)">N</span>生成质量随欧拉步数的变化<span class="sub">同一批 120 个起点</span></div>
+          <div class="viz h260" id="fm-err"></div>
+          <div class="legend">
+            <span><i style="background:var(--c3)"></i>流匹配</span>
+            <span><i style="background:var(--c4)"></i>扩散概率流 ODE</span>
+            <span><i style="background:var(--amber)"></i>当前 $N$</span>
+          </div>
+        </div>
+        <div class="stats" id="fm-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c5)">w</span>CFG 引导强度 $w$ 的效果<span class="sub">流匹配 40 步</span></div>
+          <div class="viz" id="cfg-plot" style="height:clamp(280px, 80vw, 340px)"></div>
+          <div class="legend">
+            <span><i style="background:var(--c1)"></i>上月牙样本</span>
+            <span><i style="background:var(--c2)"></i>下月牙样本</span>
+            <span><i style="background:var(--slate);opacity:.45"></i>真实数据</span>
+          </div>
+        </div>
+        <div class="stats" id="cfg-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\mathbf{x}_t = (1 - t)\mathbf{x}_0 + t\mathbf{x}_1, \qquad \mathcal{L}_{\text{FM}} = \mathbb{E}\big\| \mathbf{v}_{\boldsymbol{\theta}}(\mathbf{x}_t, t) - (\mathbf{x}_1 - \mathbf{x}_0) \big\|_2^2, \qquad \mathbf{x}_{t-\Delta t} = \mathbf{x}_t - \Delta t\, \mathbf{v}_{\boldsymbol{\theta}}(\mathbf{x}_t, t)$$</div>
+          <div class="formula">$$\tilde{\boldsymbol{\epsilon}}_{\boldsymbol{\theta}}(\mathbf{x}_t, c) = \boldsymbol{\epsilon}_{\boldsymbol{\theta}}(\mathbf{x}_t, \varnothing) + w \big(\boldsymbol{\epsilon}_{\boldsymbol{\theta}}(\mathbf{x}_t, c) - \boldsymbol{\epsilon}_{\boldsymbol{\theta}}(\mathbf{x}_t, \varnothing)\big)$$</div>
+          <p class="small muted">最优速度场是条件期望 $\mathbf v^*(\mathbf x,t)=\mathbb E[\mathbf x_1-\mathbf x_0\mid\mathbf x_t=\mathbf x]$。训练时每一对 $(\mathbf x_0,\mathbf x_1)$ 走的都是匀速直线（右图虚线）；生成时的轨迹是许多直线的平均，在双峰数据上仍会拐弯（Rectified Flow 用“重新配对”把它进一步拉直）。它的优势是沿途速度均匀。扩散的概率流 ODE $\frac{d\mathbf x}{dt}=-\frac12\beta(t)\big(\mathbf x+\nabla\ln q_t(\mathbf x)\big)$ 前半程几乎不动，最后一小段才急转直下，欧拉法步子一大就冲过头。左图用的是与 DDPM 线性调度对应的连续时间版本（$\beta$ 从 0.1 增到 20）。</p>
+          <p class="small muted">对流匹配，速度 $\mathbf v=(\boldsymbol\epsilon-\mathbf x_t)/(1-t)$ 是 $\boldsymbol\epsilon$ 的仿射函数，所以引导公式可以原样作用在 $\mathbf v$ 上（SD3、Flux 就是这样做的）。$w=0$ 是无条件生成，$w=1$ 是普通条件生成，$w&gt;1$ 相当于从 $p(\mathbf x)\,p(c\mid\mathbf x)^w$ 采样。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>把欧拉步数调到 4：右边已经是两道清晰的月牙，左边还是一团雾。看误差曲线，两边各要多少步才达标？</li>
+            <li>打开“显示生成轨迹”：右边轨迹上的点间距均匀；左边的点前半程挤成一团，最后一步跨得很远。欧拉法最怕这种忽慢忽快。</li>
+            <li>把步数调到 1：流匹配会把所有点都送到数据的平均位置，因为 $t=1$ 时 $\mathbf v^*=\mathbf x_1-\mathbb E[\mathbf x_0]$。</li>
+            <li>把 $w$ 从 0 拉到 1 再到 3、8：先从两类混合变成一类，再越来越挤向远离另一类的一侧，最后冲出数据流形。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第 15 章 · 在线实验室</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="assets/lab.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script defer src="assets/lab.js"></script>
+<script defer src="ch15.js"></script>
+<style>.se-row { display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid var(--line); font-size:13.5px; } .se-row .txt { flex:1; } .se-row .p { font-family:var(--font-num); font-weight:650; color:var(--navy); width:44px; text-align:right; } .se-chip { border:0; border-radius:999px; padding:2px 10px; font:inherit; font-size:12px; color:#fff; cursor:pointer; }</style>
+</head>
+<body data-chapter="15">
+<main class="container">
+
+  <!-- ========================= 实验 1 ========================= -->
+  <section class="experiment" id="calibration" data-title="可靠性图与温度缩放">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">1</span>一个过度自信的分类器</div>
+        <div class="explain small">模拟 10 分类任务。真实标签按 $\operatorname{Softmax}(\mathbf z^*)$ 抽取，所以 $\mathbf z^*$ 是完美校准的 Logits；模型实际输出 $\mathbf z=s\,\mathbf z^*$，$s&gt;1$ 就是盲目自信。校准集与测试集各 2000 个样本。</div>
+        <div id="c-s"></div>
+        <div id="c-t"></div>
+        <div class="btn-row">
+          <button class="btn teal" id="c-opt">牛顿法求最优 $T^*$</button>
+          <button class="btn ghost" id="c-reset">$T=1$</button>
+        </div>
+        <div class="caption" id="c-newton">温度缩放只改变置信度，不改变 argmax，所以准确率始终不变。</div>
+      </div>
+      <div class="stack">
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c4)">◩</span>可靠性图（测试集）</div>
+            <div class="viz sq" id="c-rel"></div>
+            <div class="legend">
+              <span><i style="background:var(--c1)"></i>各箱准确率</span>
+              <span><i style="background:var(--c4)"></i>与对角线的差距</span>
+              <span><i style="background:var(--c2)"></i>样本占比</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--plum)">∪</span>校准集 NLL 关于 $\beta=1/T$ 是凸的</div>
+            <div class="viz sq" id="c-nll"></div>
+            <div class="legend">
+              <span><i style="background:var(--c5)"></i>$\mathcal L_{\text{CE}}(\beta)$</span>
+              <span><i style="background:var(--c2)"></i>当前 $\beta$</span>
+              <span><i style="background:var(--c3)"></i>牛顿迭代</span>
+            </div>
+          </div>
+        </div>
+        <div class="stats" id="c-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\operatorname{ECE} = \sum_{b=1}^{B} \frac{|B_b|}{N} \big|\operatorname{acc}(B_b) - \operatorname{conf}(B_b)\big|,\qquad P_j(\beta)=\frac{e^{\beta z_j}}{\sum_k e^{\beta z_k}}$$</div>
+          <div class="formula">$$\mathcal{L}_{\text{CE}}(\beta) = -\beta z_{y^*} + \ln \sum_j e^{\beta z_j},\qquad \frac{\partial^2 \mathcal{L}_{\text{CE}}}{\partial \beta^2} = \operatorname{Var}_{j \sim P(\beta)}(z_j) &gt; 0,\qquad \beta_{k+1}=\beta_k-\frac{\mathcal L'(\beta_k)}{\mathcal L''(\beta_k)}$$</div>
+          <p class="small muted">对数配分函数的一阶导是期望 $\mathbb E_{P(\beta)}[z]$，二阶导是方差，所以 $\mathcal L_{\text{CE}}(\beta)$ 是严格凸函数，全局最优唯一，牛顿法几步就收敛。本实验中 $T^*$ 应当接近放大倍数 $s$，偏差来自有限样本。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>默认 $s=2.5$：柱子整体低于对角线，置信度虚高，ECE 约 17%。点“牛顿法”，看 $\beta$ 几步收敛、ECE 降到多少。</li>
+            <li>求出的 $T^*$ 与 $s$ 有多接近？把 $s$ 调到 1.5 或 4 再试一次。</li>
+            <li>把 $s$ 调到 0.6（模型过于谦虚），柱子跑到对角线上方，最优温度变成 $T^*&lt;1$。</li>
+            <li>手动把 $T$ 拉到很大：所有预测都挤向 10%，可靠性图变成另一种失准。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 2 ========================= -->
+  <section class="experiment" id="conformal" data-title="共形预测的覆盖保证">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">2</span>允许犯错的比例 $\alpha$</div>
+        <div id="cp-alpha"></div>
+        <div class="small muted">书中手算的测试题（四选一）：</div>
+        <div id="cp-test" style="margin:6px 0 10px"></div>
+        <hr style="border:0;border-top:1px solid var(--line);margin:12px 0">
+        <div class="small muted">大规模模拟（用实验 1 中 $s=2.5$ 的盲目自信模型，不做温度校准）：</div>
+        <div id="cp-n"></div>
+        <div class="btn-row">
+          <button class="btn teal" id="cp-run">▶ 重复 500 次试验</button>
+          <button class="btn ghost" id="cp-clear">清空</button>
+        </div>
+        <div class="caption">每次试验随机抽 $n$ 个校准样本算阈值，再在另外 200 个测试样本上统计覆盖率。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--amber)">9</span>书中手算：9 个校准样本<span class="sub" id="cp-m"></span></div>
+          <div class="viz h260" id="cp-hand"></div>
+          <div class="caption" id="cp-hand-cap"></div>
+        </div>
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c1)">s</span>校准集非一致性分数</div>
+            <div class="viz h260" id="cp-hist"></div>
+            <div class="caption">$s_i=1-P_{\boldsymbol\theta}(y_i\mid x_i)$，红线为阈值 $\hat q$。盲目自信的模型分数堆在两端。</div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c3)">%</span>每次试验的实测覆盖率</div>
+            <div class="viz h260" id="cp-cov"></div>
+            <div class="caption">绿带为理论区间 $[1-\alpha,\ 1-\alpha+\frac{1}{n+1}]$，深蓝线是累计平均。</div>
+          </div>
+        </div>
+        <div class="stats" id="cp-stats"></div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--teal)">C</span>几道测试题的预测集合</div>
+          <div id="cp-sets" class="small"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\mathcal{C}(x_{\text{test}}) = \big\{ y : 1 - P_{\boldsymbol{\theta}}(y \mid x_{\text{test}}) \le \hat{q} \big\},\qquad \hat q=s_{(m)},\quad m=\lceil (n+1)(1-\alpha) \rceil$$</div>
+          <div class="formula">$$1 - \alpha \le \mathbb{P}\big( y_{\text{test}} \in \mathcal{C}(x_{\text{test}}) \big) = \frac{m}{n+1} \le 1 - \alpha + \frac{1}{n + 1}$$</div>
+          <p class="small muted">证明只用到可交换性：测试分数 $s_{n+1}$ 在全部 $n+1$ 个分数中排第几名是等可能的，落进前 $m$ 名的概率恰为 $\frac{m}{n+1}$。若 $m&gt;n$（样本太少、$\alpha$ 太小），阈值取 $+\infty$，集合包含所有答案。保证是对“随机抽校准集 + 随机抽测试题”的平均而言，单次试验会围绕它波动。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>书中例子：$\alpha=0.10$ 时 $m=\lceil 10\times0.9\rceil=9$，$\hat q=0.78$，测试题的集合是 $\{A,B\}$。</li>
+            <li>把 $\alpha$ 调到 0.05：$m=10&gt;9$，阈值变成无穷大，四个答案全收。9 个样本撑不起 95% 的保证。</li>
+            <li>点“重复 500 次”：累计平均覆盖率稳稳落在绿带里。把 $n$ 调到 20 再跑，单次波动变大，但平均依然达标。</li>
+            <li>换成“拿不准”的测试题，集合会自动变大；“很有把握”的题集合只剩 1 个答案。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 实验 3 ========================= -->
+  <section class="experiment" id="uncertainty" data-title="偶然与认知不确定性">
+    <div class="lab-grid">
+      <div class="card controls">
+        <div class="card-title"><span class="dot">3</span>专家委员会</div>
+        <div class="explain small">一维回归：$y=f(x)+\varepsilon$，噪声越往右越大。每个集成成员在自助重采样的数据上拟合均值 $\mu_m(x)$，并用残差估计噪声方差 $\sigma_m^2(x)$。</div>
+        <div id="u-m"></div>
+        <div id="u-noise"></div>
+        <div id="u-opts"></div>
+        <div id="u-x"></div>
+        <div class="btn-row">
+          <button class="btn ghost" id="u-reseed">重新抽数据与模型</button>
+        </div>
+        <div class="caption">也可以直接在上图中点击，移动查询点 $x$。</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--c1)">μ</span>集成预测与不确定带</div>
+          <div class="viz h300" id="u-fit"></div>
+          <div class="legend">
+            <span><i style="background:var(--slate);opacity:.5"></i>各成员 $\mu_m(x)$</span>
+            <span><i style="background:var(--navy)"></i>集成均值</span>
+            <span><i style="background:var(--c2l);border:1px solid var(--c2)"></i>$\pm2\sqrt{\text{偶然}}$</span>
+            <span><i style="background:var(--c5l);border:1px solid var(--c5)"></i>$\pm2\sqrt{\text{总方差}}$</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">σ²</span>全方差分解：总方差 = 偶然 + 认知</div>
+          <div class="viz h260" id="u-dec"></div>
+          <div class="legend">
+            <span><i style="background:var(--c2)"></i>偶然 $\mathbb E_m[\sigma_m^2(x)]$</span>
+            <span><i style="background:var(--c5)"></i>认知 $\operatorname{Var}_m[\mu_m(x)]$</span>
+          </div>
+        </div>
+        <div class="stats" id="u-stats"></div>
+        <div class="row2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c6)">⚖</span>分类版：两位专家的熵分解</div>
+            <div id="u-exp-s"></div>
+            <div class="viz h260" id="u-exp"></div>
+            <div class="caption" id="u-exp-cap"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--c4)">SE</span>语义熵：先按意思合并，再算熵</div>
+            <div class="small muted">“法国的首都是哪里？”模型采样到的回答：</div>
+            <div id="se-seg" style="margin:6px 0"></div>
+            <div id="se-list"></div>
+            <div class="viz h260" id="se-bars" style="margin-top:8px"></div>
+            <div class="caption">点击回答右侧的彩色标签，可以改变它被归入的语义簇。</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--plum)">∑</span>背后的公式</div>
+          <div class="formula">$$\operatorname{Var}(y \mid x) = \underbrace{\operatorname{Var}_{\boldsymbol{\theta}}\big(\mu_{\boldsymbol{\theta}}(x)\big)}_{\text{认知}} + \underbrace{\mathbb{E}_{\boldsymbol{\theta}}\big[\sigma_{\boldsymbol{\theta}}^2(x)\big]}_{\text{偶然}}$$</div>
+          <div class="formula">$$\underbrace{\mathbb{H}\big[\mathbb{E}_{\boldsymbol\theta}P(y\mid x,\boldsymbol\theta)\big]}_{\text{总熵}} = \underbrace{\mathbb{I}(y; \boldsymbol{\theta} \mid x)}_{\text{认知}} + \underbrace{\mathbb{E}_{\boldsymbol{\theta}}\mathbb{H}\big[P(y \mid x, \boldsymbol{\theta})\big]}_{\text{偶然}},\qquad \operatorname{SE}(x) = -\sum_{k} P(c_k \mid x) \ln P(c_k \mid x)$$</div>
+          <p class="small muted">偶然不确定性来自数据本身的噪声，再多数据也消不掉；认知不确定性来自模型之间的分歧，只在缺少数据的地方变大。语义熵把意思相同的回答归入同一个簇 $c_k$，簇概率是簇内各回答概率之和。</p>
+        </div>
+        <div class="try">
+          <h3>🧪 试一试</h3>
+          <ol>
+            <li>把查询点移到中间的数据空洞：紫色的认知方差隆起，偶然方差几乎不变。取消“挖掉中间数据”，隆起消失。</li>
+            <li>移到最右侧有数据的地方：噪声大、偶然方差大，但成员们意见一致，认知方差很小。</li>
+            <li>把成员数 $M$ 调成 1：认知方差恒为 0。单个模型永远察觉不到自己的无知。</li>
+            <li>语义熵：书中例子的词元级熵约 1.05 nats，语义熵却是 0。试着把“它是浪漫之都巴黎”单独划成一簇，看语义熵如何被高估。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>
