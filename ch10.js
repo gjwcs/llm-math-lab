@@ -1,7 +1,7 @@
 /* 第 10 章：泛化理论与 Scaling Laws：交互实验 */
 (function () {
   const { COLORS: C, M } = LAB;
-  LAB.page({ bookRef: '对应书中 §10.1 三位考生与最小平方和 · §10.2 Chinchilla 求导 · §10.3 给 6×10²¹ FLOPs 算模型大小' });
+  LAB.page({ bookRef: '对应书中 §10.1 双下降：三位考生与最小平方和 · §10.2 Chinchilla 缩放定律 · §10.3 完整算例：给 6×10²¹ FLOPs 算模型大小' });
 
   const $ = (s) => document.querySelector(s);
   const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };

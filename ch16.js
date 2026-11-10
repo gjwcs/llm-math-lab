@@ -1,4 +1,4 @@
-/* 第 16 章：思维链、Best-of-N 与树搜索：交互实验 */
+/* 第 16 章：测试时推理：多想几步换更好的答案（交互实验） */
 (function () {
   const { COLORS: C, M } = LAB;
   LAB.page({ bookRef: '对应书中 §16.1 思维链的乘法账 · §16.2 Best-of-N 与 ORM/PRM · §16.3 UCT 选路 · 练习 16.1–16.2' });

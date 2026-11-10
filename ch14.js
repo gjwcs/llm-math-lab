@@ -1,4 +1,4 @@
-/* 第 14 章：神经算子 DeepONet 与傅里叶神经算子（FNO）：交互实验 */
+/* 第 14 章：神经算子：学习从函数到函数的映射（交互实验） */
 (function () {
   const { COLORS: C, M } = LAB;
   LAB.page({ bookRef: '对应书中 §14.1 铁棒热量散开算子 · §14.2 DeepONet · §14.3 FNO 与 PINO · 练习 14.1–14.2' });

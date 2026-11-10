@@ -1,7 +1,7 @@
 /* 第 12 章：解码、生成与人类对齐：交互实验 */
 (function () {
   const { COLORS: C, M } = LAB;
-  LAB.page({ bookRef: '对应书中 §12.1 贪心解码与复读 · §12.2 温度与 Top-p · §12.3–12.4 DPO 推导与手算算例' });
+  LAB.page({ bookRef: '对应书中 §12.1 贪心解码与复读 · §12.2 温度与 Top-p 采样 · §12.3–12.4 DPO 推导与完整算例' });
 
   const $ = (s) => document.querySelector(s);
   const FONT = getComputedStyle(document.body).getPropertyValue('--font');

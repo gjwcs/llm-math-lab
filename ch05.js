@@ -1,7 +1,7 @@
-/* 第 5 章：注意力机制（Attention）到底在算什么？ · 交互实验 */
+/* 第 5 章：注意力：让每个词回头查找上文 · 交互实验 */
 (function () {
   const { COLORS: C, M } = LAB;
-  LAB.page({ bookRef: '对应书中 §5.1 图书馆借书 · §5.2 Softmax 求导 · §5.3 为什么除以 √dₖ · §5.4 多头、因果掩码与 KV 缓存 · §5.5 手算演练' });
+  LAB.page({ bookRef: '对应书中 §5.1 图书馆借书 · §5.2 Softmax 求导 · §5.3 为什么除以 √dₖ · §5.4 多头、因果掩码与 KV 缓存 · §5.5 完整算例' });
   // 窄屏下长公式与宽表格改为横向滚动，不撑破版面
   document.querySelectorAll('.formula, [style*="overflow-x"]').forEach((f) => { f.style.width = '0'; f.style.minWidth = '100%'; });
   const FONT = getComputedStyle(document.body).getPropertyValue('--font');

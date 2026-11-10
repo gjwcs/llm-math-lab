@@ -1,7 +1,7 @@
 /* 第 9 章：非凸优化的导航仪：交互实验 */
 (function () {
   const { COLORS: C, M } = LAB;
-  LAB.page({ bookRef: '对应书中 §9.1 窄山谷与动量手算 · §9.2 Adam 偏差校正与 AdamW · §9.3 预热 + 余弦退火 · §9.4 全流程手算算例' });
+  LAB.page({ bookRef: '对应书中 §9.1 梯度下降与动量 · §9.2 Adam 与 AdamW · §9.3 学习率调度：预热与余弦退火 · §9.4 完整算例' });
 
   const $ = (s) => document.querySelector(s);
   const SUP = { '-': '⁻', 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };

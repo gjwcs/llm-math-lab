@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>第 11 章 · 在线实验室</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="assets/lab.css?v=20261110">
+<link rel="stylesheet" href="assets/lab.css?v=20261111">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-<script defer src="assets/lab.js?v=20261110"></script>
+<script defer src="assets/lab.js?v=20261111"></script>
 <script defer src="ch11.js"></script>
 <style>
   .vec-row { display: grid; grid-template-columns: 2.6em repeat(4, 1fr); gap: 6px; align-items: center; margin: 6px 0; }
@@ -24,7 +24,7 @@
   <section class="experiment" id="blocks" data-title="一列乘一行拼积木">
     <div class="lab-grid">
       <div class="card controls">
-        <div class="card-title"><span class="dot">1</span>斯特朗的黑板</div>
+        <div class="card-title"><span class="dot">1</span>一列乘一行的黑板</div>
         <div class="small muted">第 1 块积木：竖条 $\mathbf b_1$（$4\times1$）与横条 $\mathbf a_1^\top$（$1\times4$）</div>
         <div id="v-b1" class="vec-row"></div>
         <div id="v-a1" class="vec-row"></div>
@@ -146,7 +146,7 @@
         </div>
         <div class="stats" id="i-stats"></div>
         <div class="card">
-          <div class="card-title"><span class="dot" style="background:var(--c2)">0</span>放大一点：三种初始化各训练 150 步<span class="sub">用梯度下降拟合一个秩 2 的目标</span></div>
+          <div class="card-title"><span class="dot" style="background:var(--c2)">0</span>放大来看：三种初始化各训练 150 步<span class="sub">用梯度下降拟合一个秩 2 的目标</span></div>
           <div class="viz h260" id="s-init"></div>
           <div class="legend"><span><i style="background:var(--c3)"></i>LoRA：$\mathbf A_0$ 随机，$\mathbf B_0=\mathbf 0$</span><span><i style="background:var(--c4)"></i>全零：$\mathbf A_0=\mathbf B_0=\mathbf 0$</span><span><i style="background:var(--c2)"></i>两者都随机</span></div>
           <div style="overflow-x:auto; margin-top:8px"><table class="data" id="s-init-table"></table></div>

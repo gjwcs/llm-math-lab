@@ -1,4 +1,4 @@
-/* 第 7 章：深层信号传播动力学：交互实验 */
+/* 第 7 章：深度：让百层网络稳定传递信号 · 交互实验 */
 (function () {
   const { COLORS: C, M } = LAB;
   LAB.page({ bookRef: '对应书中 §7.1 残差直通车与 Pre-Norm · §7.2 LayerNorm 与 RMSNorm 手算 · §7.3 SwiGLU 与 1/√(2L) 缩放 · §7.4 手算一层 · 练习 7.1–7.3' });

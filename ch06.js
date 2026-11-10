@@ -1,7 +1,7 @@
-/* 第 6 章：怎么让模型知道词的先后顺序？（RoPE） · 交互实验 */
+/* 第 6 章：位置编码：让模型分清词的先后 · 交互实验 */
 (function () {
   const { COLORS: C, M } = LAB;
-  LAB.page({ bookRef: '对应书中 §6.1 狗咬人与人咬狗 · §6.3 RoPE 钟表指针 · §6.4 秒针、分针、时针与长文外推 · §6.5 四维手算演练' });
+  LAB.page({ bookRef: '对应书中 §6.1 狗咬人与人咬狗 · §6.3 RoPE 钟表指针 · §6.4 秒针、分针、时针与长文外推 · §6.5 4 维完整算例' });
   // 窄屏下长公式与宽表格改为横向滚动，不撑破版面
   document.querySelectorAll('.formula, [style*="overflow-x"]').forEach((f) => { f.style.width = '0'; f.style.minWidth = '100%'; });
   const FONT = getComputedStyle(document.body).getPropertyValue('--font');
